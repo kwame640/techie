@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, X, Sparkles } from 'lucide-react';
+import logoImage from '../src/images/nkay.png';
 
 const LAUNCH_DEADLINE = new Date('2026-09-06T23:59:59').getTime();
 
@@ -67,7 +68,7 @@ export const LaunchCountdown = ({ onClose, closable = true }: { onClose: () => v
         {/* Header */}
         <div className="bg-gradient-to-br from-primary to-primary-light px-8 py-6 text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <img src="/src/images/nkay.png" alt="NKAY" className="h-8 w-auto" />
+            <img src={logoImage} alt="NKAY" className="h-8 w-auto" />
           </div>
           <p className="text-white/80 text-sm font-medium tracking-wider uppercase">
             NKAY LAUNCH 2026
