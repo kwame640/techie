@@ -84,7 +84,7 @@ export const PromoBanner: React.FC = () => {
   );
 };
 
-const Badge: React.FC<{ variant: string; className?: string; children: React.ReactNode }> = ({ variant, className, children }) => {
+const Badge: React.FC<{ variant: string; className?: string; children: React.ReactNode }> = ({ className, children }) => {
   return (
     <span className={className}>
       {children}

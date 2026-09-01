@@ -14,7 +14,6 @@ import {
   Bell,
   Store,
   ArrowUpRight,
-  ArrowDownRight,
   Menu,
   X
 } from 'lucide-react';

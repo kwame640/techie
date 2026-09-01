@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { X, CheckCircle, ShoppingCart, Heart } from 'lucide-react';
-import { cn } from '../../lib/utils';
 
 interface ToastProps {
   message: string;

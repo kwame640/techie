@@ -1,10 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { 
   TrendingUp, 
-  Store, 
   Package, 
   ShoppingBag, 
-  Users, 
   Truck, 
   DollarSign,
   Bell

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Store, Mail, Phone, MapPin, Upload, Check, X, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Store, Mail, Phone, MapPin, Check, X, Image as ImageIcon, AlertCircle } from 'lucide-react';
 
 interface UploadedImage {
   file: File;

@@ -6,8 +6,7 @@ import {
   signInWithPopup, 
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut,
-  User as FirebaseUser 
+  signOut
 } from 'firebase/auth';
 
 // Firebase config for NKAY Technologies

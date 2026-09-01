@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Search, ShoppingBag, Heart, User, Menu, X } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 import { Icon } from './ui/Icon';
-import { Button } from './ui/Button';
 import logoImage from '../images/nkay.png';
 
 export const Header: React.FC = () => {

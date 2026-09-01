@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Star, Store, Truck, MapPin } from 'lucide-react';
+import { ShoppingCart, Star, Store, Truck } from 'lucide-react';
 import { sampleProducts, sampleBusinesses } from '../../data/marketplaceData';
 
 export const ProductPage = () => {

@@ -1,12 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '../types';
-import { Card, CardContent, CardFooter } from './ui/Card';
+import { Card, CardContent } from './ui/Card';
 import { Button } from './ui/Button';
 import { StarRating } from './ui/StarRating';
 import { Badge } from './ui/Badge';
 import { Heart, Eye, ShoppingCart } from 'lucide-react';
-import { Icon } from './ui/Icon';
 import { useShop } from '../context/ShopContext';
 import { formatPrice } from '../lib/utils';
 

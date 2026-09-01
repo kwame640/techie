@@ -11,7 +11,7 @@ export const CategoryPage: React.FC = () => {
     product => product.category.toLowerCase() === category?.toLowerCase()
   );
   
-  const categoryTitle = category?.charAt(0).toUpperCase() + category?.slice(1) || 'Category';
+  const categoryTitle = category ? category.charAt(0).toUpperCase() + category.slice(1) : 'Category';
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MapPin, Star, Clock, Filter, Store } from 'lucide-react';
+import { Search, MapPin, Star, Filter, Store } from 'lucide-react';
 import { sampleBusinesses, businessCategories, ghanaRegions } from '../../data/marketplaceData';
 
 export const BusinessDiscovery = () => {
