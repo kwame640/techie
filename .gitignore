@@ -1,0 +1,4 @@
+node_modules
+.env
+uploads/business-images/*
+!uploads/business-images/.gitkeep
