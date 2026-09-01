@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, X, Sparkles } from 'lucide-react';
-import logoImage from '../src/images/nkay.png';
+import logoImage from '../images/nkay.png';
 
 const LAUNCH_DEADLINE = new Date('2026-09-06T23:59:59').getTime();
 
