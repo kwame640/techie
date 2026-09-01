@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import logoImage from '../../images/nkay.png';
 
 export const BusinessLoginPage = () => {
   const [email, setEmail] = useState('');
@@ -35,7 +36,7 @@ export const BusinessLoginPage = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <img src="/src/images/nkay.png" alt="NKAY" className="h-16 w-auto mx-auto mb-4" />
+          <img src={logoImage} alt="NKAY" className="h-16 w-auto mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-text">Welcome back</h1>
           <p className="text-text-light mt-2">Sign in to your NKAY business account</p>
         </div>

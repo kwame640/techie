@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, MapPin, Star, Filter, Store } from 'lucide-react';
 import { sampleBusinesses, businessCategories, ghanaRegions } from '../../data/marketplaceData';
+import logoImage from '../../images/nkay.png';
 
 export const BusinessDiscovery = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,7 +27,7 @@ export const BusinessDiscovery = () => {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <img src="/src/images/nkay.png" alt="NKAY" className="h-10 w-auto" />
+              <img src={logoImage} alt="NKAY" className="h-10 w-auto" />
             </Link>
             <div className="flex items-center gap-4">
               <Link to="/" className="text-text-light hover:text-primary transition">

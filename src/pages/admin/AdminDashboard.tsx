@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Clock, CheckCircle, XCircle, LogOut, Eye, ChevronLeft, ChevronRight, X, Trash2, Image as ImageIcon } from 'lucide-react';
+import logoImage from '../../images/nkay.png';
 
 interface BusinessImage {
   id: string;
@@ -218,7 +219,7 @@ export const AdminDashboard = () => {
       <header className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/src/images/nkay.png" alt="NKAY" className="h-10 w-auto" />
+            <img src={logoImage} alt="NKAY" className="h-10 w-auto" />
             <span className="text-xl font-bold text-primary">Admin Dashboard</span>
           </div>
           <button

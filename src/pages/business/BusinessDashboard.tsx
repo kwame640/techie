@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { BusinessMobileNav } from '../../components/BusinessMobileNav';
+import logoImage from '../../images/nkay.png';
 import { 
   TrendingUp, 
   ShoppingBag, 
@@ -74,7 +75,7 @@ export const BusinessDashboard = () => {
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
               <Link to="/" className="flex items-center gap-2">
-                <img src="/src/images/nkay.png" alt="NKAY" className="h-8 w-auto" />
+                <img src={logoImage} alt="NKAY" className="h-8 w-auto" />
               </Link>
               <span className="hidden md:inline text-text-light">|</span>
               <span className="hidden md:inline font-medium">{business.name}</span>

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Store, ShoppingBag, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import logoImage from '../../images/nkay.png';
 
 export const RoleSelector = () => {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export const RoleSelector = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-4xl w-full">
         <div className="text-center mb-12">
-          <img src="/src/images/nkay.png" alt="NKAY" className="h-16 w-auto mx-auto mb-2" />
+          <img src={logoImage} alt="NKAY" className="h-16 w-auto mx-auto mb-2" />
           <p className="text-text-light text-lg">Choose how you want to use NKAY</p>
         </div>
 

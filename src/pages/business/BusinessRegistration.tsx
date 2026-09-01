@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Store, Mail, Phone, MapPin, Check, X, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import logoImage from '../images/nkay.png';
 
 interface UploadedImage {
   file: File;
@@ -250,7 +251,7 @@ export const BusinessRegistration = () => {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <img src="/src/images/nkay.png" alt="NKAY" className="h-8 w-auto" />
+              <img src={logoImage} alt="NKAY" className="h-8 w-auto" />
             </Link>
           </div>
         </div>

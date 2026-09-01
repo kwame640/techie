@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { MapPin, Star, Phone, Mail, ShoppingCart, Store, Heart } from 'lucide-react';
 import { sampleBusinesses, sampleProducts } from '../../data/marketplaceData';
+import logoImage from '../../images/nkay.png';
 
 export const StorePage = () => {
   const { storeId } = useParams<{ storeId: string }>();
@@ -48,7 +49,7 @@ export const StorePage = () => {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <img src="/src/images/nkay.png" alt="NKAY" className="h-6 w-auto" />
+            <img src={logoImage} alt="NKAY" className="h-6 w-auto" />
             <span className="font-medium">Marketplace</span>
           </Link>
         </div>

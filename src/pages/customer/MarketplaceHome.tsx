@@ -4,6 +4,7 @@ import { MapPin, Star, Clock, Truck, Store } from 'lucide-react';
 import { sampleBusinesses, sampleProducts, businessCategories } from '../../data/marketplaceData';
 import { TypingText } from '../../components/TypingText';
 import { LaunchCountdown } from '../../components/LaunchCountdown';
+import logoImage from '../../images/nkay.png';
 
 export const MarketplaceHome = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export const MarketplaceHome = () => {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <img src="/src/images/nkay.png" alt="NKAY" className="h-10 w-auto" />
+              <img src={logoImage} alt="NKAY" className="h-10 w-auto" />
             </Link>
             <div className="flex items-center gap-4">
               <Link to="/login" className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition">
@@ -184,7 +185,7 @@ export const MarketplaceHome = () => {
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <img src="/src/images/nkay.png" alt="NKAY" className="h-10 w-auto mb-4" />
+              <img src={logoImage} alt="NKAY" className="h-10 w-auto mb-4" />
               <p className="text-text-light text-sm">
                 Grow your business with NKAY. The marketplace that connects businesses with customers.
               </p>
