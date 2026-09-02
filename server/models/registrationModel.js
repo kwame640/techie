@@ -5,7 +5,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DB_PATH = path.join(__dirname, 'data', 'registrations.json');
+const DB_PATH = process.env.VERCEL
+  ? path.join('/tmp', 'nkay_data', 'registrations.json')
+  : path.join(__dirname, 'data', 'registrations.json');
 
 function ensureDbExists() {
   const dir = path.dirname(DB_PATH);

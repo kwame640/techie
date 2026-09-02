@@ -7,7 +7,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads', 'business-images');
+const UPLOAD_DIR = process.env.VERCEL
+  ? path.join('/tmp', 'nkay_uploads', 'business-images')
+  : path.join(__dirname, '..', '..', 'uploads', 'business-images');
 
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
