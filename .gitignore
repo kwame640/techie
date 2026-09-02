@@ -1,4 +1,5 @@
 node_modules
+dist
 .env
 uploads/business-images/*
 !uploads/business-images/.gitkeep
