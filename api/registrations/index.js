@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { getAllRegistrations, getRegistrationById, updateRegistrationStatus } = await import('../../server/models/githubStorage.js');
+    const { getAllRegistrations, getRegistrationById, updateRegistrationStatus } = await import('../../server/models/registrationModel.js');
 
     if (req.method === 'GET') {
       const { id } = req.query;

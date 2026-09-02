@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { getRegistrationStats } = await import('../../server/models/githubStorage.js');
+    const { getRegistrationStats } = await import('../../server/models/registrationModel.js');
     const stats = await getRegistrationStats();
     return res.status(200).json({ success: true, stats });
   } catch (error) {

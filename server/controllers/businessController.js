@@ -8,7 +8,7 @@ export const registerBusiness = async (req, res) => {
   let uploadedImages = [];
 
   try {
-    const businessData = req.body;
+    const businessData = req.body || {};
     const files = req.files || [];
 
     const requiredFields = [

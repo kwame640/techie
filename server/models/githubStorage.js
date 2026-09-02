@@ -1,3 +1,11 @@
+import {
+  getAllRegistrations as getLocalRegistrations,
+  getRegistrationById as getLocalRegistrationById,
+  createRegistration as createLocalRegistration,
+  updateRegistrationStatus as updateLocalRegistrationStatus,
+  getRegistrationStats as getLocalRegistrationStats,
+} from './registrationModel.js';
+
 const GIST_ID = process.env.GIST_ID || '';
 const API_BASE = 'https://api.github.com';
 
@@ -54,6 +62,7 @@ async function writeGist(content) {
 }
 
 export async function getAllRegistrations() {
+  if (!GIST_ID) return getLocalRegistrations();
   try {
     return await readGist();
   } catch (e) {
@@ -63,11 +72,13 @@ export async function getAllRegistrations() {
 }
 
 export async function getRegistrationById(id) {
+  if (!GIST_ID) return getLocalRegistrationById(id);
   const all = await getAllRegistrations();
   return all.find(r => r.id === id) || null;
 }
 
 export async function createRegistration(data) {
+  if (!GIST_ID) return createLocalRegistration(data);
   const content = await readGist();
   const newRegistration = {
     id: 'reg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
@@ -81,6 +92,7 @@ export async function createRegistration(data) {
 }
 
 export async function updateRegistrationStatus(id, status) {
+  if (!GIST_ID) return updateLocalRegistrationStatus(id, status);
   const content = await readGist();
   const index = content.findIndex(r => r.id === id);
   if (index === -1) return null;
@@ -91,6 +103,7 @@ export async function updateRegistrationStatus(id, status) {
 }
 
 export async function getRegistrationStats() {
+  if (!GIST_ID) return getLocalRegistrationStats();
   const all = await getAllRegistrations();
   return {
     total: all.length,
