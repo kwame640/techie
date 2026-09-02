@@ -1,24 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Store, Mail, Phone, MapPin, Check, X, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Store, Mail, Phone, MapPin, Check } from 'lucide-react';
 import logoImage from '../../images/nkay.png';
-
-interface UploadedImage {
-  file: File;
-  preview: string;
-  id: string;
-}
 
 export const BusinessRegistration = () => {
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState(1);
+  const totalSteps = 2;
   const [isSuccess, setIsSuccess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [imageErrors, setImageErrors] = useState<string[]>([]);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [formData, setFormData] = useState({
     businessName: '',
     businessType: '',
@@ -32,11 +23,6 @@ export const BusinessRegistration = () => {
     preferredContactMethod: 'email',
     description: '',
   });
-  const [businessImages, setBusinessImages] = useState<UploadedImage[]>([]);
-
-  const MAX_FILE_SIZE = 5 * 1024 * 1024;
-  const MAX_IMAGES = 5;
-  const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
@@ -51,90 +37,9 @@ export const BusinessRegistration = () => {
     }
   };
 
-  const validateImage = (file: File): string | null => {
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return `${file.name}: Invalid file type. Only JPG, PNG, WEBP allowed.`;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      return `${file.name}: File too large. Maximum 5MB per image.`;
-    }
-    return null;
-  };
-
-  const handleFilesAdd = (files: FileList | null) => {
-    if (!files) return;
-
-    const newErrors: string[] = [];
-    const validFiles: UploadedImage[] = [];
-
-    const remainingSlots = MAX_IMAGES - businessImages.length;
-    if (remainingSlots <= 0) {
-      setImageErrors([`Maximum ${MAX_IMAGES} images allowed.`]);
-      return;
-    }
-
-    const filesToProcess = Array.from(files).slice(0, remainingSlots);
-
-    if (files.length > remainingSlots) {
-      newErrors.push(`Only ${remainingSlots} more image(s) allowed. First ${remainingSlots} selected.`);
-    }
-
-    filesToProcess.forEach((file) => {
-      const error = validateImage(file);
-      if (error) {
-        newErrors.push(error);
-      } else {
-        validFiles.push({
-          file,
-          preview: URL.createObjectURL(file),
-          id: `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-        });
-      }
-    });
-
-    setBusinessImages([...businessImages, ...validFiles]);
-    setImageErrors(newErrors);
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleFilesAdd(e.target.files);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const removeImage = (id: string) => {
-    setBusinessImages(businessImages.filter((img) => {
-      if (img.id === id) {
-        URL.revokeObjectURL(img.preview);
-        return false;
-      }
-      return true;
-    }));
-    setImageErrors([]);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    handleFilesAdd(e.dataTransfer.files);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
-    setUploadProgress(0);
-    setImageErrors([]);
 
     try {
       const formDataToSend = new FormData();
@@ -143,62 +48,23 @@ export const BusinessRegistration = () => {
         formDataToSend.append(key, value);
       });
 
-      businessImages.forEach((img) => {
-        formDataToSend.append('businessImages', img.file);
+      const response = await fetch('/api/business/register', {
+        method: 'POST',
+        body: formDataToSend,
       });
 
-      const totalSteps = 10;
-      let currentStep = 0;
-      const updateProgress = () => {
-        currentStep++;
-        setUploadProgress(Math.round((currentStep / totalSteps) * 100));
-      };
-
-      updateProgress();
-
-      const xhr = new XMLHttpRequest();
-
-      const uploadPromise = new Promise<{ success: boolean; error?: string }>((resolve, reject) => {
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 100);
-            setUploadProgress(percentComplete);
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(JSON.parse(xhr.responseText));
-          } else {
-            reject(new Error(xhr.responseText));
-          }
-        });
-
-        xhr.addEventListener('error', () => reject(new Error('Upload failed')));
-        xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
-
-        xhr.open('POST', '/api/business/register');
-        xhr.send(formDataToSend);
-      });
-
-      const result = await uploadPromise;
+      const result = await response.json();
 
       if (result.success) {
         setIsSuccess(true);
       } else {
-        setImageErrors([result.error || 'Registration failed']);
+        alert(result.error || 'Registration failed. Please try again.');
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      try {
-        const errorData = JSON.parse(error.message);
-        setImageErrors([errorData.error || 'Registration failed. Please try again.']);
-      } catch {
-        setImageErrors(['Registration failed. Please try again.']);
-      }
+      alert('Registration failed. Please try again.');
     } finally {
       setIsUploading(false);
-      setUploadProgress(0);
     }
   };
 
@@ -229,6 +95,9 @@ export const BusinessRegistration = () => {
           newErrors.phone = 'Phone number must be exactly 10 digits';
         }
       }
+      if (!formData.preferredContactMethod) {
+        newErrors.preferredContactMethod = 'Preferred contact method is required';
+      }
     }
 
     setErrors(newErrors);
@@ -236,7 +105,7 @@ export const BusinessRegistration = () => {
   };
 
   const nextStep = () => {
-    if (validateStep(step) && step < 3) {
+    if (validateStep(step) && step < totalSteps) {
       setStep(step + 1);
     }
   };
@@ -264,14 +133,14 @@ export const BusinessRegistration = () => {
         </div>
 
         <div className="flex items-center justify-center mb-12">
-          {[1, 2, 3].map((s) => (
+          {[1, 2].map((s) => (
             <React.Fragment key={s}>
               <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
                 step >= s ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
               }`}>
                 {step >= s ? <Check className="w-5 h-5" /> : s}
               </div>
-              {s < 3 && (
+              {s < 2 && (
                 <div className={`w-24 h-1 mx-2 ${step > s ? 'bg-primary' : 'bg-gray-200'}`} />
               )}
             </React.Fragment>
@@ -281,62 +150,19 @@ export const BusinessRegistration = () => {
         {isSuccess ? (
           <div className="bg-white rounded-2xl shadow-card p-12 text-center">
             <div className="mb-8">
-              <div className="relative w-32 h-32 mx-auto">
-                <svg className="w-full h-full" viewBox="0 0 100 100">
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    fill="none"
-                    stroke="#10B981"
-                    strokeWidth="4"
-                    className="animate-draw-circle"
-                  />
-                  <path
-                    d="M30 50 L45 65 L70 35"
-                    fill="none"
-                    stroke="#10B981"
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="animate-draw-check"
-                  />
-                </svg>
-              </div>
+              <img src="https://media.giphy.com/media/3o7TKoWXm3okO1kgHC/giphy.gif" alt="Success" className="w-32 h-32 mx-auto" />
             </div>
             
             <h2 className="text-3xl font-bold text-green-600 mb-4">Registration Successful!</h2>
             <p className="text-text-light text-lg mb-8">
-              Your business registration has been submitted successfully. Our team will review your application within 24-48 hours.
+              We will contact you soon to proceed with your business registration.
             </p>
             
-            <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
-              <h3 className="font-semibold text-green-800 mb-3">What's Next?</h3>
-              <ul className="text-left space-y-2 text-green-700">
-                <li className="flex items-start gap-2">
-                  <Check className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                  <span>Check your email for confirmation details</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                  <span>Complete your store setup after approval</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                  <span>Start adding your products</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                  <span>Begin selling to thousands of customers</span>
-                </li>
-              </ul>
-            </div>
-            
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/')}
               className="w-full px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-medium"
             >
-              Return to Login
+              Return to Home
             </button>
           </div>
         ) : (
@@ -567,141 +393,6 @@ export const BusinessRegistration = () => {
               </div>
             )}
 
-            {step === 3 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-semibold mb-2">Business Photos</h2>
-                  <p className="text-text-light mb-6">Upload photos that show your business, products, storefront, services, or workspace.</p>
-                </div>
-
-                {imageErrors.length > 0 && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        {imageErrors.map((err, idx) => (
-                          <p key={idx} className="text-sm text-red-600">{err}</p>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div
-                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
-                    isDragOver
-                      ? 'border-primary bg-primary/5'
-                      : businessImages.length >= MAX_IMAGES
-                      ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                      : 'border-gray-300 hover:border-primary hover:bg-primary/5'
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => businessImages.length < MAX_IMAGES && fileInputRef.current?.click()}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleImageUpload}
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    multiple
-                    className="hidden"
-                    id="business-images-upload"
-                    disabled={businessImages.length >= MAX_IMAGES}
-                  />
-                  
-                  <div className="flex flex-col items-center">
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
-                      isDragOver ? 'bg-primary/10' : 'bg-gray-100'
-                    }`}>
-                      <ImageIcon className={`w-8 h-8 ${isDragOver ? 'text-primary' : 'text-gray-400'}`} />
-                    </div>
-                    
-                    {isDragOver ? (
-                      <p className="text-primary font-medium mb-2">Drop images here</p>
-                    ) : (
-                      <>
-                        <p className="text-text mb-2">
-                          <span className="text-primary font-medium">Click to upload</span> or drag and drop
-                        </p>
-                        <p className="text-sm text-text-light">
-                          JPG, PNG, WEBP • Max 5MB each • Up to {MAX_IMAGES} photos
-                        </p>
-                      </>
-                    )}
-                    
-                    <div className="mt-4 text-sm text-text-light">
-                      {businessImages.length} / {MAX_IMAGES} photos
-                    </div>
-                  </div>
-                </div>
-
-                {businessImages.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-text">Selected Photos</h3>
-                      <span className="text-sm text-text-light">{businessImages.length} of {MAX_IMAGES}</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                      {businessImages.map((img, index) => (
-                        <div
-                          key={img.id}
-                          className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 shadow-sm"
-                        >
-                          <img
-                            src={img.preview}
-                            alt={`Business photo ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeImage(img.id);
-                              }}
-                              className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
-                          <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                            {(img.file.size / 1024 / 1024).toFixed(1)} MB
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {isUploading && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-text-light">Uploading...</span>
-                      <span className="font-medium">{uploadProgress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-primary h-full rounded-full transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-accent-beige rounded-lg p-6">
-                  <h3 className="font-semibold mb-2">What happens next?</h3>
-                  <ul className="space-y-2 text-sm text-text-light">
-                    <li>• Your application will be reviewed within 24-48 hours</li>
-                    <li>• You'll receive a confirmation email with next steps</li>
-                    <li>• Once approved, you can start adding products</li>
-                    <li>• Our team will help you set up your store</li>
-                  </ul>
-                </div>
-              </div>
-            )}
 
             <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
               {step > 1 ? (
@@ -716,7 +407,7 @@ export const BusinessRegistration = () => {
                 <div />
               )}
 
-              {step < 3 ? (
+              {step < totalSteps ? (
                 <button
                   type="button"
                   onClick={nextStep}
@@ -733,7 +424,7 @@ export const BusinessRegistration = () => {
                   {isUploading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Uploading...
+                      Submitting...
                     </>
                   ) : (
                     'Submit Registration'
