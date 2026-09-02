@@ -10,7 +10,6 @@
     "server": "node server/index.js"
   },
   "dependencies": {
-    "@vercel/kv": "^3.0.0",
     "clsx": "^2.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
