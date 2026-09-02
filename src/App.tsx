@@ -11,7 +11,6 @@ import { CustomerCheckout } from './pages/customer/CustomerCheckout';
 import { CustomerOrders } from './pages/customer/CustomerOrders';
 import { CustomerProfile } from './pages/customer/CustomerProfile';
 import { MarketplaceHome } from './pages/customer/MarketplaceHome';
-import { LaunchCountdown } from './components/LaunchCountdown';
 
 // Business Pages
 import { BusinessDashboard } from './pages/business/BusinessDashboard';
@@ -58,19 +57,6 @@ const BlurWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <p className="text-text-light text-sm">This page is currently under development</p>
         </div>
       </div>
-    </div>
-  );
-};
-
-// Launch Countdown Page - shows only the banner (non-closable)
-const LaunchCountdownPage: React.FC = () => {
-  const handleClose = () => {
-    // Do nothing - can't close the banner on homepage
-  };
-
-  return (
-    <div className="min-h-screen bg-background">
-      <LaunchCountdown onClose={handleClose} closable={false} />
     </div>
   );
 };
