@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { createRegistration } = await import('../../server/models/registrationModel.js');
+    const { createRegistration } = await import('../../server/models/firestoreRegistrationModel.js');
     const businessData = req.body || {};
 
     const requiredFields = ['businessName', 'businessType', 'businessCategory', 'email', 'preferredContactMethod'];
