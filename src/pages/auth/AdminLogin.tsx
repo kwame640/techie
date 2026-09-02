@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail } from 'lucide-react';
-import logoImage from '../images/nkay.png';
+import logoImage from '../../images/nkay.png';
 
 export const AdminLogin = () => {
   const [email, setEmail] = useState('');
@@ -16,7 +16,7 @@ export const AdminLogin = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3001/api/admin/login', {
+      const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

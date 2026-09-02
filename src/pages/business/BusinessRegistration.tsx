@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Store, Mail, Phone, MapPin, Check, X, Image as ImageIcon, AlertCircle } from 'lucide-react';
-import logoImage from '../images/nkay.png';
+import logoImage from '../../images/nkay.png';
 
 interface UploadedImage {
   file: File;
@@ -177,7 +177,7 @@ export const BusinessRegistration = () => {
         xhr.addEventListener('error', () => reject(new Error('Upload failed')));
         xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
 
-        xhr.open('POST', 'http://localhost:3001/api/business/register');
+        xhr.open('POST', '/api/business/register');
         xhr.send(formDataToSend);
       });
 

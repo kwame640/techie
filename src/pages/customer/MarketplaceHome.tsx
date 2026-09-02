@@ -8,7 +8,7 @@ import logoImage from '../../images/nkay.png';
 
 export const MarketplaceHome = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showLaunchBanner, setShowLaunchBanner] = useState(true);
+  const [showLaunchBanner, setShowLaunchBanner] = useState(false);
 
   const handleCloseBanner = () => {
     setShowLaunchBanner(false);

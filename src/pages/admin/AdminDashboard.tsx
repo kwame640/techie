@@ -61,10 +61,10 @@ export const AdminDashboard = () => {
   const fetchData = async () => {
     try {
       const [regRes, statsRes] = await Promise.all([
-        fetch('http://localhost:3001/api/admin/registrations', {
+        fetch('/api/registrations', {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch('http://localhost:3001/api/admin/stats', {
+        fetch('/api/stats', {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -83,7 +83,7 @@ export const AdminDashboard = () => {
 
   const fetchRegistrationDetails = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/admin/registrations/${id}`, {
+      const response = await fetch(`/api/registrations/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
@@ -98,7 +98,7 @@ export const AdminDashboard = () => {
 
   const handleStatusChange = async (id: string, status: 'Pending' | 'Approved' | 'Rejected') => {
     try {
-      const response = await fetch(`http://localhost:3001/api/admin/registrations/${id}/status`, {
+      const response = await fetch(`/api/registrations/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -122,7 +122,7 @@ export const AdminDashboard = () => {
     if (!confirm('Are you sure you want to delete this image?')) return;
 
     try {
-      const response = await fetch(`http://localhost:3001/api/admin/images/${imageId}`, {
+      const response = await fetch(`/api/images/${imageId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -431,7 +431,7 @@ export const AdminDashboard = () => {
                           onClick={() => openLightbox(index)}
                         >
                           <img
-                            src={`http://localhost:3001${img.imageUrl}`}
+                            src={img.imageUrl}
                             alt={`Business photo ${index + 1}`}
                             className="w-full h-full object-cover hover:scale-105 transition-transform"
                           />
@@ -501,7 +501,7 @@ export const AdminDashboard = () => {
 
           <div className="max-w-5xl max-h-[90vh] p-4">
             <img
-              src={`http://localhost:3001${selectedImages[currentImageIndex].imageUrl}`}
+              src={selectedImages[currentImageIndex].imageUrl}
               alt={`Business photo ${currentImageIndex + 1}`}
               className="max-w-full max-h-[85vh] object-contain mx-auto"
             />

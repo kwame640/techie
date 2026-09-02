@@ -10,6 +10,7 @@ import { CustomerCart } from './pages/customer/CustomerCart';
 import { CustomerCheckout } from './pages/customer/CustomerCheckout';
 import { CustomerOrders } from './pages/customer/CustomerOrders';
 import { CustomerProfile } from './pages/customer/CustomerProfile';
+import { MarketplaceHome } from './pages/customer/MarketplaceHome';
 import { LaunchCountdown } from './components/LaunchCountdown';
 
 // Business Pages
@@ -116,8 +117,8 @@ function App() {
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminDashboard />} />
 
-          {/* Customer Routes - Homepage shows only Launch Banner */}
-          <Route path="/" element={<LaunchCountdownPage />} />
+          {/* Customer Routes */}
+          <Route path="/" element={<MarketplaceHome />} />
           <Route path="/discover" element={<BusinessDiscovery />} />
           <Route path="/store/:storeId" element={<StorePage />} />
           <Route path="/product/:productId" element={<ProductPage />} />
