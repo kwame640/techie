@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { createRegistration } = await import('../../server/models/registrationModel.js');
+    const { createRegistration } = await import('../../server/models/registrationModelKV.js');
     const businessData = req.body || {};
 
     const requiredFields = ['businessName', 'businessType', 'businessCategory', 'email', 'preferredContactMethod'];
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       description: businessData.description || '',
     };
 
-    const saved = createRegistration(registrationData);
+    const saved = await createRegistration(registrationData);
 
     return res.status(200).json({
       success: true,
