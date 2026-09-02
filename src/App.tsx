@@ -10,7 +10,6 @@ import { CustomerCart } from './pages/customer/CustomerCart';
 import { CustomerCheckout } from './pages/customer/CustomerCheckout';
 import { CustomerOrders } from './pages/customer/CustomerOrders';
 import { CustomerProfile } from './pages/customer/CustomerProfile';
-import { MarketplaceHome } from './pages/customer/MarketplaceHome';
 import { LaunchCountdown } from './components/LaunchCountdown';
 
 // Business Pages
