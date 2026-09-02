@@ -42,15 +42,10 @@ export const BusinessRegistration = () => {
     setIsUploading(true);
 
     try {
-      const formDataToSend = new FormData();
-
-      Object.entries(formData).forEach(([key, value]) => {
-        formDataToSend.append(key, value);
-      });
-
       const response = await fetch('/api/business/register', {
         method: 'POST',
-        body: formDataToSend,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
       });
 
       const result = await response.json();
@@ -148,22 +143,29 @@ export const BusinessRegistration = () => {
         </div>
 
         {isSuccess ? (
-          <div className="bg-white rounded-2xl shadow-card p-12 text-center">
-            <div className="mb-8">
-              <img src="https://media.giphy.com/media/3o7TKoWXm3okO1kgHC/giphy.gif" alt="Success" className="w-32 h-32 mx-auto" />
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="bg-white rounded-2xl shadow-lg p-8 md:p-12 text-center max-w-md w-full animate-fade-in-scale">
+              <div className="mb-8">
+                <div className="w-24 h-24 mx-auto rounded-full bg-green-50 flex items-center justify-center">
+                  <img src="https://media.giphy.com/media/3o7TKoWXm3okO1kgHC/giphy.gif" alt="Success" className="w-16 h-16" />
+                </div>
+              </div>
+              
+              <h2 className="text-3xl font-bold text-primary mb-4">Registration Successful</h2>
+              <p className="text-text text-lg mb-3">
+                Your registration has been successfully submitted.
+              </p>
+              <p className="text-text-light text-sm mb-8">
+                Thank you for registering with NKAY. Our team will review your information and get back to you soon.
+              </p>
+              
+              <button
+                onClick={() => navigate('/')}
+                className="w-full px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-medium"
+              >
+                Back to Home
+              </button>
             </div>
-            
-            <h2 className="text-3xl font-bold text-green-600 mb-4">Registration Successful!</h2>
-            <p className="text-text-light text-lg mb-8">
-              We will contact you soon to proceed with your business registration.
-            </p>
-            
-            <button
-              onClick={() => navigate('/')}
-              className="w-full px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-medium"
-            >
-              Return to Home
-            </button>
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow-card p-8">
