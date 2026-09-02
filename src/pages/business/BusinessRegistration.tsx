@@ -160,10 +160,10 @@ export const BusinessRegistration = () => {
               </p>
               
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/login')}
                 className="w-full px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-medium"
               >
-                Back to Home
+                Back to Login
               </button>
             </div>
           </div>
