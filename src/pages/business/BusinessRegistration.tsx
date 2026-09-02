@@ -147,7 +147,9 @@ export const BusinessRegistration = () => {
             <div className="bg-white rounded-2xl shadow-lg p-8 md:p-12 text-center max-w-md w-full animate-fade-in-scale">
               <div className="mb-8">
                 <div className="w-24 h-24 mx-auto rounded-full bg-green-50 flex items-center justify-center">
-                  <img src="https://media.giphy.com/media/3o7TKoWXm3okO1kgHC/giphy.gif" alt="Success" className="w-16 h-16" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
                 </div>
               </div>
               
