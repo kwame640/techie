@@ -3,16 +3,14 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
   try {
-    const { createRegistration } = await import('../../server/models/registrationModel.js');
+    const { createRegistration } = await import('../../server/models/githubStorage.js');
     const businessData = req.body || {};
 
     const requiredFields = ['businessName', 'businessType', 'businessCategory', 'email', 'preferredContactMethod'];
@@ -43,7 +41,7 @@ export default async function handler(req, res) {
       description: businessData.description || '',
     };
 
-    const saved = createRegistration(registrationData);
+    const saved = await createRegistration(registrationData);
 
     return res.status(200).json({
       success: true,
