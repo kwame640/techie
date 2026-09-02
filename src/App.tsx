@@ -11,6 +11,7 @@ import { CustomerCheckout } from './pages/customer/CustomerCheckout';
 import { CustomerOrders } from './pages/customer/CustomerOrders';
 import { CustomerProfile } from './pages/customer/CustomerProfile';
 import { MarketplaceHome } from './pages/customer/MarketplaceHome';
+import { LaunchCountdown } from './components/LaunchCountdown';
 
 // Business Pages
 import { BusinessDashboard } from './pages/business/BusinessDashboard';
@@ -61,6 +62,19 @@ const BlurWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
+// Launch Countdown Page - shows only the banner (non-closable)
+const LaunchCountdownPage: React.FC = () => {
+  const handleClose = () => {
+    // Do nothing - can't close the banner on homepage
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <LaunchCountdown onClose={handleClose} closable={false} />
+    </div>
+  );
+};
+
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ 
   children, 
@@ -104,7 +118,7 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
 
           {/* Customer Routes */}
-          <Route path="/" element={<MarketplaceHome />} />
+          <Route path="/" element={<LaunchCountdownPage />} />
           <Route path="/discover" element={<BusinessDiscovery />} />
           <Route path="/store/:storeId" element={<StorePage />} />
           <Route path="/product/:productId" element={<ProductPage />} />
