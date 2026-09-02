@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Clock, CheckCircle, XCircle, LogOut, Eye, ChevronLeft, ChevronRight, X, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Building2, Clock, CheckCircle, XCircle, LogOut, Eye, ChevronLeft, ChevronRight, X, Trash2, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
 import logoImage from '../../images/nkay.png';
 
 interface BusinessImage {
@@ -46,6 +46,10 @@ export const AdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   const token = localStorage.getItem('adminToken');
@@ -141,6 +145,77 @@ export const AdminDashboard = () => {
     } catch (error) {
       console.error('Failed to delete image:', error);
     }
+  };
+
+  const readFileAsDataUrl = (file: File): Promise<{ name: string; type: string; dataUrl: string }> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ name: file.name, type: file.type, dataUrl: reader.result as string });
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleUploadImages = async (files: FileList | File[]) => {
+    if (!selectedRegistration) return;
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    for (const f of fileArray) {
+      if (!allowed.includes(f.type)) {
+        setUploadError(`Unsupported file type: ${f.type}`);
+        return;
+      }
+    }
+
+    setIsUploading(true);
+    setUploadError('');
+
+    try {
+      const imagesPayload = await Promise.all(fileArray.map(readFileAsDataUrl));
+
+      const response = await fetch('/api/images/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          registrationId: selectedRegistration.id,
+          images: imagesPayload,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setSelectedImages([...selectedImages, ...data.images]);
+        if (selectedRegistration) {
+          setSelectedRegistration({
+            ...selectedRegistration,
+            images: [...(selectedRegistration.images || []), ...data.images],
+          });
+        }
+        fetchData();
+      } else {
+        setUploadError(data.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadError('Failed to upload images');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) handleUploadImages(e.target.files);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files) handleUploadImages(e.dataTransfer.files);
   };
 
   const handleViewRegistration = (reg: Registration) => {
@@ -420,9 +495,42 @@ export const AdminDashboard = () => {
                 <p className="text-text">{selectedRegistration.description || 'No description provided'}</p>
               </div>
 
-              {selectedImages.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-text mb-3">Business Photos ({selectedImages.length})</p>
+              <div>
+                <p className="text-sm font-medium text-text mb-3">Business Photos ({selectedImages.length})</p>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={handleDrop}
+                  className={`mb-4 border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer ${
+                    isDragOver ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-primary/50'
+                  }`}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  {isUploading ? (
+                    <div className="flex flex-col items-center gap-2 text-primary">
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                      <p className="text-sm font-medium">Uploading...</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-text-light">
+                      <Upload className="w-8 h-8" />
+                      <p className="text-sm font-medium text-text">Click or drag images here to upload</p>
+                      <p className="text-xs">JPG, PNG, WEBP, GIF • Max 20 photos total</p>
+                    </div>
+                  )}
+                  {uploadError && (
+                    <p className="mt-2 text-sm text-red-600">{uploadError}</p>
+                  )}
+                </div>
+                {selectedImages.length > 0 && (
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                     {selectedImages.map((img, index) => (
                       <div key={img.id} className="relative group">
@@ -446,8 +554,8 @@ export const AdminDashboard = () => {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             <div className="p-6 border-t bg-gray-50 flex gap-3 sticky bottom-0">
               <button
