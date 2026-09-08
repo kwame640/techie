@@ -11,16 +11,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { getAllRegistrations, getRegistrationById, updateRegistrationStatus } = await import('../../server/models/firestoreRegistrationModel.js');
+    const { getAllRegistrations, getRegistrationById, updateRegistrationStatus } = await import('../../server/models/registrationModel.js');
 
     if (req.method === 'GET') {
       const { id } = req.query;
       if (id) {
-        const registration = await getRegistrationById(id);
+        const registration = getRegistrationById(id);
         if (!registration) return res.status(404).json({ success: false, error: 'Not found' });
         return res.status(200).json({ success: true, registration: { ...registration, images: [] } });
       }
-      const registrations = await getAllRegistrations();
+      const registrations = getAllRegistrations();
       const withCount = registrations.map(reg => ({ ...reg, imageCount: 0 }));
       return res.status(200).json({ success: true, registrations: withCount });
     }
@@ -29,13 +29,9 @@ export default async function handler(req, res) {
       const { id } = req.query;
       const { status } = req.body || {};
       if (!id || !status) return res.status(400).json({ success: false, error: 'id and status required' });
-      const updated = await updateRegistrationStatus(id, status);
+      const updated = updateRegistrationStatus(id, status);
       if (!updated) return res.status(404).json({ success: false, error: 'Not found' });
       return res.status(200).json({ success: true, registration: updated });
-    }
-
-    if (req.method === 'POST') {
-      return res.status(405).json({ success: false, error: 'Use /api/business/register to create registrations' });
     }
 
     return res.status(405).json({ success: false, error: 'Method not allowed' });

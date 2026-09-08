@@ -25,7 +25,7 @@ interface Registration {
   country: string;
   preferredContactMethod: string;
   description: string;
-  status: 'Pending' | 'Approved' | 'Rejected';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Suspended';
   registrationDate: string;
   imageCount?: number;
   images?: BusinessImage[];
@@ -49,6 +49,7 @@ export const AdminDashboard = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'Approved' | 'Pending' | 'Rejected' | 'Suspended' | 'All'>('Approved');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -100,7 +101,7 @@ export const AdminDashboard = () => {
     }
   };
 
-  const handleStatusChange = async (id: string, status: 'Pending' | 'Approved' | 'Rejected') => {
+  const handleStatusChange = async (id: string, status: 'Pending' | 'Approved' | 'Rejected' | 'Suspended') => {
     try {
       const response = await fetch(`/api/registrations/${id}`, {
         method: 'PATCH',
@@ -251,6 +252,7 @@ export const AdminDashboard = () => {
       Pending: 'bg-yellow-100 text-yellow-800',
       Approved: 'bg-green-100 text-green-800',
       Rejected: 'bg-red-100 text-red-800',
+      Suspended: 'bg-gray-100 text-gray-800',
     };
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles]}`}>
@@ -268,6 +270,10 @@ export const AdminDashboard = () => {
       minute: '2-digit',
     });
   };
+
+  const visibleRegistrations = statusFilter === 'All'
+    ? registrations
+    : registrations.filter((registration) => registration.status === statusFilter);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -297,13 +303,22 @@ export const AdminDashboard = () => {
             <img src={logoImage} alt="NKAY" className="h-10 w-auto" />
             <span className="text-xl font-bold text-primary">Admin Dashboard</span>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-text-light hover:text-primary transition"
-          >
-            <LogOut className="w-5 h-5" />
-            Logout
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/vendor-dashboard')}
+              className="inline-flex items-center gap-2 bg-primary text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition"
+            >
+              <CheckCircle className="w-4 h-4" />
+              Approved Vendors
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-text-light hover:text-primary transition"
+            >
+              <LogOut className="w-5 h-5" />
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
@@ -357,12 +372,28 @@ export const AdminDashboard = () => {
 
         <div className="bg-white rounded-xl shadow-card overflow-hidden">
           <div className="p-6 border-b">
-            <h2 className="text-lg font-semibold text-text">Business Registrations</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-text">Approved Vendors</h2>
+                <p className="text-sm text-text-light mt-1">Only approved vendors can enter the NKAY Vendor Dashboard.</p>
+              </div>
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+              >
+                <option value="Approved">Approved only</option>
+                <option value="Pending">Pending applications</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Suspended">Suspended</option>
+                <option value="All">All registrations</option>
+              </select>
+            </div>
           </div>
-          {registrations.length === 0 ? (
+          {visibleRegistrations.length === 0 ? (
             <div className="p-12 text-center text-text-light">
               <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>No registrations yet</p>
+              <p>{statusFilter === 'Approved' ? 'No approved vendors yet' : 'No registrations found'}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -380,7 +411,7 @@ export const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {registrations.map(reg => (
+                  {visibleRegistrations.map(reg => (
                     <tr key={reg.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <p className="font-medium text-text">{reg.businessName}</p>
@@ -575,6 +606,12 @@ export const AdminDashboard = () => {
                 className="flex-1 py-2 px-4 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition"
               >
                 Set Pending
+              </button>
+              <button
+                onClick={() => handleStatusChange(selectedRegistration.id, 'Suspended')}
+                className="flex-1 py-2 px-4 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-800 transition"
+              >
+                Suspend Vendor
               </button>
             </div>
           </div>

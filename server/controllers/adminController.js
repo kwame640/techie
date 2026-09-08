@@ -60,7 +60,7 @@ export const updateStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!status || !['Pending', 'Approved', 'Rejected'].includes(status)) {
+    if (!status || !['Pending', 'Approved', 'Rejected', 'Suspended'].includes(status)) {
       return res.status(400).json({ 
         success: false, 
         error: 'Invalid status. Must be Pending, Approved, or Rejected.' 

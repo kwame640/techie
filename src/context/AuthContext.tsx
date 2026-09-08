@@ -12,6 +12,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string, role: 'customer' | 'business' | 'driver' | 'admin') => Promise<void>;
+  loginVendor: (businessName: string, email: string) => Promise<void>;
   signup: (email: string, password: string, role: 'customer' | 'business' | 'driver' | 'admin') => Promise<void>;
   loginWithGoogle: (role: 'customer' | 'business' | 'driver' | 'admin') => Promise<void>;
   logout: () => void;
@@ -94,6 +95,55 @@ const createUserData = (firebaseUser: any, role: 'customer' | 'business' | 'driv
   }
 };
 
+const getApprovedBusiness = async (businessName: string, email: string) => {
+  let response: Response;
+
+  try {
+    response = await fetch(`/api/business/access?businessName=${encodeURIComponent(businessName)}&email=${encodeURIComponent(email)}`);
+  } catch {
+    throw new Error('NKAY vendor services are unavailable. Start the backend server and try again.');
+  }
+
+  const responseText = await response.text();
+  let data: any;
+
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    throw new Error('NKAY vendor services returned an invalid response. Please try again.');
+  }
+
+  if (!response.ok || !data) {
+    throw new Error(data?.error || 'NKAY vendor services are unavailable. Please try again.');
+  }
+
+  const registration = data.registration;
+
+  if (registration?.status === 'Suspended') {
+    throw new Error('Store Suspended. Please contact NKAY support.');
+  }
+
+  if (!registration || registration.status !== 'Approved') {
+    throw new Error('Your NKAY vendor account is waiting for admin approval.');
+  }
+
+  return {
+    firebaseUid: null,
+    role: 'business',
+    createdAt: new Date().toISOString(),
+    id: registration.id,
+    email: registration.email || email,
+    name: registration.businessName,
+    phone: registration.phone || '',
+    category: registration.businessCategory,
+    city: registration.city,
+    region: registration.region,
+    description: registration.description,
+    status: 'live',
+    verificationStatus: 'approved',
+  };
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [business, setBusiness] = useState<any | null>(null);
@@ -104,6 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Listen to Firebase auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      const storedVendor = localStorage.getItem('vendorSession');
       if (firebaseUser) {
         // User is signed in, check localStorage for role and user data
         const storedUser = localStorage.getItem('user');
@@ -122,6 +173,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAdmin(parsedUser);
           }
         }
+      } else if (storedVendor) {
+        setBusiness(JSON.parse(storedVendor));
       } else {
         // User is signed out
         setUser(null);
@@ -137,7 +190,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string, role: 'customer' | 'business' | 'driver' | 'admin') => {
     try {
-      const firebaseUser = await signInWithEmail(email, password);
+      let firebaseUser;
+
+      if (role === 'business') {
+        try {
+          firebaseUser = await signInWithEmail(email, password);
+        } catch (signInError: any) {
+          if (signInError?.code !== 'auth/invalid-credential') throw signInError;
+          firebaseUser = await signUpWithEmail(email, password);
+        }
+      } else {
+        firebaseUser = await signInWithEmail(email, password);
+      }
+
       const userData = createUserData(firebaseUser, role, email);
       
       if (role === 'customer') {
@@ -154,8 +219,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('userRole', role);
     } catch (error) {
       console.error('Login error:', error);
+      if (role === 'business') await signOutUser();
       throw error;
     }
+  };
+
+  const loginVendor = async (businessName: string, email: string) => {
+    const userData = await getApprovedBusiness(businessName, email);
+    setBusiness(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('userRole', 'business');
+    localStorage.setItem('vendorSession', JSON.stringify(userData));
   };
 
   const signup = async (email: string, password: string, role: 'customer' | 'business' | 'driver' | 'admin') => {
@@ -184,7 +258,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async (role: 'customer' | 'business' | 'driver' | 'admin') => {
     try {
       const firebaseUser = await signInWithGoogle();
-      const userData = createUserData(firebaseUser, role, firebaseUser.email || '');
+      const userData = role === 'business'
+        ? await getApprovedBusiness(firebaseUser.displayName || '', firebaseUser.email || '')
+        : createUserData(firebaseUser, role, firebaseUser.email || '');
       
       if (role === 'customer') {
         setUser(userData);
@@ -200,6 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('userRole', role);
     } catch (error) {
       console.error('Google sign-in error:', error);
+      if (role === 'business') await signOutUser();
       throw error;
     }
   };
@@ -213,6 +290,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAdmin(null);
       localStorage.removeItem('user');
       localStorage.removeItem('userRole');
+      localStorage.removeItem('vendorSession');
     } catch (error) {
       console.error('Logout error:', error);
       throw error;
@@ -222,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAuthenticated = !!user || !!business || !!driver || !!admin;
 
   return (
-    <AuthContext.Provider value={{ user, business, driver, admin, isAuthenticated, isLoading, login, signup, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, business, driver, admin, isAuthenticated, isLoading, login, loginVendor, signup, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

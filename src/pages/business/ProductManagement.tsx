@@ -1,83 +1,24 @@
-import { useState } from 'react';
-import { Plus, Search, Filter, MoreVertical } from 'lucide-react';
+import { ChangeEvent, DragEvent, useMemo, useState } from 'react';
+import { Eye, GripVertical, ImagePlus, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { sampleProducts } from '../../data/marketplaceData';
+import { Currency, PageHeading, StatusBadge, VendorLayout } from '../../components/VendorLayout';
 
 export const ProductManagement = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [query, setQuery] = useState('');
+  const products = useMemo(() => sampleProducts.filter((product) => product.name.toLowerCase().includes(query.toLowerCase()) || product.category.toLowerCase().includes(query.toLowerCase())), [query]);
+  return <VendorLayout title="Products"><PageHeading title="My Products" description="Add, update, and keep track of what is in your store." action={<Link to="/business/products/add" className="inline-flex items-center gap-2 bg-[#6f3d27] text-white px-4 py-2.5 rounded-xl text-sm font-semibold"><Plus className="w-4 h-4" />Add Product</Link>} /><section className="bg-white border border-[#eee5df] rounded-2xl overflow-hidden shadow-[0_4px_18px_rgba(74,43,28,0.04)]"><div className="p-5 border-b border-[#f1ebe7] flex flex-col sm:flex-row gap-3"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#ad9b91]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search products" className="w-full h-11 rounded-xl border border-[#e7ddd7] pl-10 pr-4 text-sm outline-none focus:border-[#6f3d27]" /></div><select className="h-11 rounded-xl border border-[#e7ddd7] px-3 text-sm text-[#6f5c50] bg-white"><option>All categories</option><option>Electronics</option><option>Fashion</option><option>Groceries</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[760px]"><thead className="bg-[#fcfaf9] text-left text-[11px] uppercase tracking-wide text-[#9a887d]"><tr><th className="px-5 py-3">Product</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Price</th><th className="px-5 py-3">Stock</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Actions</th></tr></thead><tbody>{products.map((product) => <tr key={product.id} className="border-t border-[#f1ebe7] text-sm"><td className="px-5 py-4"><div className="flex items-center gap-3"><div className="w-11 h-11 rounded-xl bg-[#f5ebe5] overflow-hidden"><img src={product.images[0]} alt="" className="w-full h-full object-cover" /></div><div><p className="font-semibold">{product.name}</p><p className="text-xs text-[#927f74]">{product.salesCount} sold</p></div></div></td><td className="px-5 py-4 text-[#806e64]">{product.category}</td><td className="px-5 py-4 font-semibold"><Currency value={product.price} /></td><td className="px-5 py-4">{product.stock}</td><td className="px-5 py-4"><StatusBadge status={product.status} /></td><td className="px-5 py-4"><div className="flex items-center gap-1"><button className="p-2 rounded-lg hover:bg-[#f7f1ed]" title="Edit"><Pencil className="w-4 h-4" /></button><button className="p-2 rounded-lg hover:bg-[#f7f1ed]" title="View"><Eye className="w-4 h-4" /></button><button className="p-2 rounded-lg hover:bg-[#fbe8e6] text-[#a23d35]" title="Delete"><Trash2 className="w-4 h-4" /></button></div></td></tr>)}</tbody></table></div>{products.length === 0 && <p className="p-10 text-center text-sm text-[#927f74]">No products match your search.</p>}</section></VendorLayout>;
+};
 
-  return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Products</h1>
-        <button className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition">
-          <Plus className="w-5 h-5" />
-          Add Product
-        </button>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-card">
-        <div className="p-4 border-b border-gray-200 flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-accent-beige transition">
-            <Filter className="w-5 h-5" />
-            Filter
-          </button>
-        </div>
-
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Product</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Category</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Price</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Stock</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Status</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sampleProducts.map((product) => (
-              <tr key={product.id} className="border-t border-gray-100 hover:bg-gray-50">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-accent-beige rounded-lg"></div>
-                    <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-text-light">{product.salesCount} sold</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm">{product.category}</td>
-                <td className="px-6 py-4 text-sm font-medium">GH₵{product.price}</td>
-                <td className="px-6 py-4 text-sm">{product.stock}</td>
-                <td className="px-6 py-4">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    product.status === 'active' ? 'bg-green-100 text-green-700' :
-                    product.status === 'draft' ? 'bg-gray-100 text-gray-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {product.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <button className="p-2 hover:bg-accent-beige rounded-lg transition">
-                    <MoreVertical className="w-5 h-5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+interface UploadImage { id: string; name: string; url: string; }
+export const AddProduct = () => {
+  const [images, setImages] = useState<UploadImage[]>([]);
+  const [mainImage, setMainImage] = useState('');
+  const [dragging, setDragging] = useState(false);
+  const addImages = (files: FileList | File[]) => { const next = Array.from(files).filter((file) => file.type.startsWith('image/')).slice(0, 6 - images.length).map((file) => ({ id: `${file.name}-${Date.now()}-${Math.random()}`, name: file.name, url: URL.createObjectURL(file) })); setImages((current) => [...current, ...next]); if (!mainImage && next[0]) setMainImage(next[0].id); };
+  const moveImage = (index: number, direction: -1 | 1) => { const target = index + direction; if (target < 0 || target >= images.length) return; const next = [...images]; [next[index], next[target]] = [next[target], next[index]]; setImages(next); };
+  const removeImage = (id: string) => { const next = images.filter((image) => image.id !== id); setImages(next); if (mainImage === id) setMainImage(next[0]?.id || ''); };
+  const upload = (event: ChangeEvent<HTMLInputElement>) => { if (event.target.files) addImages(event.target.files); };
+  const drop = (event: DragEvent<HTMLLabelElement>) => { event.preventDefault(); setDragging(false); addImages(event.dataTransfer.files); };
+  return <VendorLayout title="Add Product"><PageHeading title="Add a New Product" description="Add the basics first. You can update the product later." /><section className="max-w-4xl bg-white border border-[#eee5df] rounded-2xl p-5 sm:p-7 shadow-[0_4px_18px_rgba(74,43,28,0.04)]"><div className="grid sm:grid-cols-2 gap-5"><label className="sm:col-span-2 text-sm font-semibold">Product Name<input className="mt-2 w-full h-11 rounded-xl border border-[#e7ddd7] px-3 font-normal" placeholder="e.g. Handmade Kente Shirt" /></label><label className="text-sm font-semibold">Category<select className="mt-2 w-full h-11 rounded-xl border border-[#e7ddd7] px-3 font-normal bg-white"><option>Choose category</option><option>Fashion</option><option>Electronics</option><option>Beauty</option><option>Groceries</option></select></label><label className="text-sm font-semibold">Price (GH₵)<input type="number" className="mt-2 w-full h-11 rounded-xl border border-[#e7ddd7] px-3 font-normal" placeholder="0.00" /></label><label className="text-sm font-semibold">Stock Quantity<input type="number" className="mt-2 w-full h-11 rounded-xl border border-[#e7ddd7] px-3 font-normal" placeholder="0" /></label><label className="text-sm font-semibold">Product Status<select className="mt-2 w-full h-11 rounded-xl border border-[#e7ddd7] px-3 font-normal bg-white"><option>Active</option><option>Draft</option></select></label><label className="sm:col-span-2 text-sm font-semibold">Product Description<textarea className="mt-2 w-full min-h-28 rounded-xl border border-[#e7ddd7] p-3 font-normal" placeholder="Tell customers what makes this product useful." /></label></div><div className="mt-7"><div className="flex items-center justify-between mb-3"><div><p className="text-sm font-semibold">Product Images</p><p className="text-xs text-[#927f74] mt-1">Add up to 6 images. Choose a main image for your product card.</p></div><span className="text-xs text-[#927f74]">{images.length}/6</span></div><label onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={drop} className={`flex flex-col items-center justify-center min-h-36 rounded-2xl border-2 border-dashed cursor-pointer transition ${dragging ? 'border-[#6f3d27] bg-[#f7f1ed]' : 'border-[#d7c7bd] hover:bg-[#fcfaf9]'}`}><ImagePlus className="w-8 h-8 text-[#8a553a]" /><p className="font-semibold mt-2">+ Upload Product Images</p><p className="text-xs text-[#927f74] mt-1">Drag and drop or click to browse</p><input type="file" accept="image/*" multiple className="hidden" onChange={upload} /></label>{images.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">{images.map((image, index) => <div key={image.id} className={`relative rounded-xl border-2 overflow-hidden ${mainImage === image.id ? 'border-[#6f3d27]' : 'border-[#eee5df]'}`}><img src={image.url} alt={image.name} className="w-full aspect-square object-cover" /><div className="absolute inset-x-0 bottom-0 bg-[#2d211b]/75 p-2 text-white"><button type="button" onClick={() => setMainImage(image.id)} className="text-[10px] font-semibold">{mainImage === image.id ? 'Main image' : 'Set as main'}</button><div className="flex items-center justify-between mt-1"><span className="text-[10px] opacity-80">{index + 1}</span><div className="flex gap-1"><button type="button" onClick={() => moveImage(index, -1)} disabled={index === 0} className="text-xs disabled:opacity-40"><GripVertical className="w-3.5 h-3.5" /></button><button type="button" onClick={() => removeImage(image.id)} className="text-xs"><X className="w-3.5 h-3.5" /></button></div></div></div></div>)}</div>}</div><div className="flex flex-col sm:flex-row gap-3 mt-8"><button className="bg-[#6f3d27] text-white px-6 py-3 rounded-xl font-semibold">Publish Product</button><button className="border border-[#e7ddd7] text-[#6f3d27] px-6 py-3 rounded-xl font-semibold">Save as Draft</button></div></section></VendorLayout>;
 };

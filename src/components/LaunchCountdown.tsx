@@ -87,7 +87,7 @@ export const LaunchCountdown = ({ onClose, closable = true }: { onClose: () => v
             {pad(timeLeft.days)} DAYS LEFT
           </h2>
           <p className="text-xl md:text-2xl font-semibold text-primary mb-4">
-            Register Your Business for FREE
+           This September register Your Business for FREE
           </p>
 
           {/* Countdown */}

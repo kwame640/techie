@@ -1,10 +1,6 @@
-export const CustomerManagement = () => {
-  return (
-    <div className="min-h-screen bg-background p-8">
-      <h1 className="text-2xl font-bold mb-6">Customers</h1>
-      <div className="bg-white rounded-xl p-6 shadow-card">
-        <p className="text-text-light">Customer management page</p>
-      </div>
-    </div>
-  );
-};
+import { useState } from 'react';
+import { Search, Users } from 'lucide-react';
+import { sampleOrders } from '../../data/marketplaceData';
+import { Currency, PageHeading, VendorLayout } from '../../components/VendorLayout';
+
+export const CustomerManagement = () => { const [query, setQuery] = useState(''); const customers = Array.from(new Map(sampleOrders.map((order) => [order.customerId, order])).values()).filter((order) => order.customerName.toLowerCase().includes(query.toLowerCase())); return <VendorLayout title="Customers"><PageHeading title="Customers" description="See the people who shop from your store." /><section className="bg-white border border-[#eee5df] rounded-2xl overflow-hidden shadow-[0_4px_18px_rgba(74,43,28,0.04)]"><div className="p-5 border-b border-[#f1ebe7]"><div className="relative max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#ad9b91]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search customers" className="w-full h-11 rounded-xl border border-[#e7ddd7] pl-10 pr-4 text-sm" /></div></div><div className="overflow-x-auto"><table className="w-full min-w-[650px]"><thead className="bg-[#fcfaf9] text-left text-[11px] uppercase tracking-wide text-[#9a887d]"><tr><th className="px-5 py-3">Customer</th><th className="px-5 py-3">Orders</th><th className="px-5 py-3">Total spent</th><th className="px-5 py-3">Last order</th><th className="px-5 py-3">Location</th></tr></thead><tbody>{customers.map((customer) => <tr key={customer.customerId} className="border-t border-[#f1ebe7] text-sm"><td className="px-5 py-4"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-[#ead9ce] text-[#6b3926] flex items-center justify-center font-semibold">{customer.customerName.split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><p className="font-semibold">{customer.customerName}</p><p className="text-xs text-[#927f74]">{customer.customerEmail}</p></div></div></td><td className="px-5 py-4">1</td><td className="px-5 py-4 font-semibold"><Currency value={customer.total} /></td><td className="px-5 py-4 text-[#806e64]">{new Date(customer.createdAt).toLocaleDateString('en-GH', { month: 'short', day: 'numeric' })}</td><td className="px-5 py-4 text-[#806e64]">{customer.deliveryAddress.city}</td></tr>)}</tbody></table></div>{customers.length === 0 && <div className="p-10 text-center"><Users className="w-8 h-8 mx-auto text-[#b49d91]" /><p className="text-sm text-[#927f74] mt-2">No customers found.</p></div>}</section></VendorLayout>; };

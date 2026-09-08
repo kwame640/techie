@@ -29,9 +29,11 @@ export async function getAllRegistrations() {
   if (!database) return localModel.getAllRegistrations();
 
   const snapshot = await database.collection(collectionName).get();
-  return snapshot.docs
+  const registrations = snapshot.docs
     .map(document => document.data())
     .sort((first, second) => second.registrationDate.localeCompare(first.registrationDate));
+
+  return registrations.length > 0 ? registrations : localModel.getAllRegistrations();
 }
 
 export async function getRegistrationById(id) {

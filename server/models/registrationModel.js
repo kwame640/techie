@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 const DB_PATH = process.env.VERCEL
   ? path.join('/tmp', 'nkay_data', 'registrations.json')
   : path.join(__dirname, 'data', 'registrations.json');
+const SEED_DB_PATH = path.join(__dirname, 'data', 'registrations.json');
 
 function ensureDbExists() {
   const dir = path.dirname(DB_PATH);
@@ -23,8 +24,14 @@ function readDb() {
   ensureDbExists();
   try {
     const data = fs.readFileSync(DB_PATH, 'utf-8');
-    return JSON.parse(data);
+    const registrations = JSON.parse(data);
+    if (registrations.length > 0 || !process.env.VERCEL) return registrations;
+
+    return JSON.parse(fs.readFileSync(SEED_DB_PATH, 'utf-8'));
   } catch (error) {
+    if (process.env.VERCEL && fs.existsSync(SEED_DB_PATH)) {
+      return JSON.parse(fs.readFileSync(SEED_DB_PATH, 'utf-8'));
+    }
     return [];
   }
 }

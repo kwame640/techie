@@ -1,5 +1,38 @@
 [
   {
+    "id": "reg_1788679711783_tss91pz",
+    "businessName": "b dfhtr",
+    "businessType": "restaurant",
+    "businessCategory": "fashion",
+    "email": "godfreda938@gmail.com",
+    "phone": "0000000000",
+    "address": "Yiadom-Hwedie Street",
+    "city": "Koforidua",
+    "region": "Western",
+    "country": "Ghana",
+    "preferredContactMethod": "email",
+    "description": "ddd",
+    "status": "Approved",
+    "registrationDate": "2026-09-06T07:28:31.783Z",
+    "updatedAt": "2026-09-06T07:41:02.816Z"
+  },
+  {
+    "id": "reg_1788385827056_7q40uun",
+    "businessName": "Registration Probe",
+    "businessType": "retail",
+    "businessCategory": "electronics",
+    "email": "probe@example.com",
+    "phone": "",
+    "address": "",
+    "city": "",
+    "region": "",
+    "country": "",
+    "preferredContactMethod": "email",
+    "description": "",
+    "status": "Pending",
+    "registrationDate": "2026-09-02T21:50:27.056Z"
+  },
+  {
     "id": "reg_1788285843313_1eri8nt",
     "businessName": "fgh btrj5",
     "businessType": "retail",

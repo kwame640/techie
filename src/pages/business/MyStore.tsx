@@ -1,22 +1,7 @@
+import { ChangeEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Clock3, ExternalLink, MapPin, Pencil, Phone, Store } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { PageHeading, VendorLayout } from '../../components/VendorLayout';
 
-export const MyStore = () => {
-  const { business } = useAuth();
-
-  if (!business) return <div>Loading...</div>;
-
-  return (
-    <div className="min-h-screen bg-background p-8">
-      <h1 className="text-2xl font-bold mb-6">My Store</h1>
-      <div className="bg-white rounded-xl p-6 shadow-card">
-        <h2 className="text-xl font-semibold mb-4">{business.name}</h2>
-        <p className="text-text-light mb-4">{business.description}</p>
-        <div className="flex gap-3">
-          <Link to="/business/store" className="px-4 py-2 bg-primary text-white rounded-lg">View Store</Link>
-          <button className="px-4 py-2 border border-gray-200 rounded-lg">Edit Store</button>
-        </div>
-      </div>
-    </div>
-  );
-};
+export const MyStore = () => { const { business } = useAuth(); const [logo, setLogo] = useState(''); const [banner, setBanner] = useState(''); if (!business) return null; const chooseImage = (event: ChangeEvent<HTMLInputElement>, setter: (value: string) => void) => { const file = event.target.files?.[0]; if (file) setter(URL.createObjectURL(file)); }; return <VendorLayout title="My Store"><PageHeading title="My Store" description="Keep your store information clear and up to date for customers." action={<button className="inline-flex items-center gap-2 bg-[#6f3d27] text-white px-4 py-2.5 rounded-xl text-sm font-semibold"><Pencil className="w-4 h-4" />Edit Store</button>} /><div className="grid xl:grid-cols-[1.1fr_0.9fr] gap-6"><section className="bg-white border border-[#eee5df] rounded-2xl p-6 shadow-[0_4px_18px_rgba(74,43,28,0.04)]"><div className="relative h-32 rounded-xl bg-[#f5ebe5] overflow-hidden"><div className="absolute inset-0 bg-gradient-to-r from-[#6f3d27]/60 to-transparent" />{banner && <img src={banner} alt="Store banner" className="w-full h-full object-cover" />}<label className="absolute bottom-3 right-3 bg-white/90 text-[#6f3d27] rounded-lg px-3 py-2 text-xs font-semibold cursor-pointer">Change banner<input type="file" accept="image/*" className="hidden" onChange={(event) => chooseImage(event, setBanner)} /></label></div><div className="flex items-end gap-4 -mt-8 ml-4 relative"><div className="w-20 h-20 rounded-2xl bg-[#ead9ce] border-4 border-white text-[#70402b] flex items-center justify-center overflow-hidden">{logo ? <img src={logo} alt="Store logo" className="w-full h-full object-cover" /> : <Store className="w-9 h-9" />}</div><label className="mb-1 text-xs font-semibold text-[#6f3d27] cursor-pointer">Change logo<input type="file" accept="image/*" className="hidden" onChange={(event) => chooseImage(event, setLogo)} /></label></div><div className="mt-5 pb-6 border-b border-[#f1ebe7]"><h2 className="text-2xl font-bold">{business.name}</h2><p className="text-sm text-[#927f74] mt-1">{business.category || 'Marketplace store'}</p><span className="inline-flex mt-3 px-2.5 py-1 rounded-full bg-[#e6f4ea] text-[#23723a] text-xs font-semibold">{business.status === 'live' ? 'Active' : 'Pending setup'}</span></div><p className="text-sm text-[#806e64] leading-6 mt-6">{business.description || 'Add a short description to tell customers what makes your store special.'}</p><div className="grid sm:grid-cols-2 gap-5 mt-7 text-sm"><div className="flex gap-3"><Phone className="w-4 h-4 text-[#8a553a] mt-0.5" /><div><p className="text-xs text-[#927f74]">Phone number</p><p className="font-medium mt-1">{business.phone || 'Not added'}</p></div></div><div className="flex gap-3"><MapPin className="w-4 h-4 text-[#8a553a] mt-0.5" /><div><p className="text-xs text-[#927f74]">Location</p><p className="font-medium mt-1">{business.city || 'Accra'}, {business.region || 'Greater Accra'}</p></div></div><div className="flex gap-3"><Clock3 className="w-4 h-4 text-[#8a553a] mt-0.5" /><div><p className="text-xs text-[#927f74]">Opening hours</p><p className="font-medium mt-1">Mon - Sat, 9:00 AM - 6:00 PM</p></div></div></div></section><section className="bg-[#3f2418] rounded-2xl p-6 text-white min-h-[300px] flex flex-col justify-between"><div><p className="text-xs uppercase tracking-[0.18em] text-[#d8b7a3]">Store preview</p><h2 className="text-2xl font-bold mt-3">{business.name}</h2><p className="text-sm text-[#e5d4ca] mt-3 leading-6">This is how customers will see your store on NKAY Marketplace.</p></div><Link to={`/store/${business.id}`} className="inline-flex items-center justify-center gap-2 bg-white text-[#3f2418] rounded-xl px-4 py-3 text-sm font-semibold w-full sm:w-fit"><ExternalLink className="w-4 h-4" />View My Store</Link></section></div></VendorLayout>; };

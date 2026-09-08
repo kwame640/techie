@@ -42,7 +42,7 @@ export const registerBusiness = async (req, res) => {
       businessName: businessData.businessName,
       businessType: businessData.businessType,
       businessCategory: businessData.businessCategory,
-      email: businessData.email,
+      email: String(businessData.email || '').trim().toLowerCase(),
       phone: businessData.phone || '',
       address: businessData.address || '',
       city: businessData.city || '',

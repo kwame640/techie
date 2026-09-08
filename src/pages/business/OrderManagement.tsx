@@ -1,43 +1,19 @@
+import { useMemo, useState } from 'react';
+import { Eye, Search, X } from 'lucide-react';
 import { sampleOrders } from '../../data/marketplaceData';
+import { Currency, PageHeading, StatusBadge, VendorLayout } from '../../components/VendorLayout';
+
+const statusLabel = (status: string) => status === 'new' ? 'Pending' : status === 'delivered' ? 'Completed' : status === 'out_for_delivery' ? 'Shipped' : status === 'cancelled' ? 'Cancelled' : 'Processing';
+const nextStatuses = ['Pending', 'Processing', 'Ready for Delivery', 'Completed'];
 
 export const OrderManagement = () => {
-  return (
-    <div className="min-h-screen bg-background p-8">
-      <h1 className="text-2xl font-bold mb-6">Orders</h1>
-      <div className="bg-white rounded-xl shadow-card">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Order ID</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Customer</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Amount</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Status</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-text-light">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sampleOrders.map((order) => (
-              <tr key={order.id} className="border-t border-gray-100 hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium">{order.id}</td>
-                <td className="px-6 py-4">{order.customerName}</td>
-                <td className="px-6 py-4 font-medium">GH₵{order.total}</td>
-                <td className="px-6 py-4">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    order.orderStatus === 'new' ? 'bg-orange-100 text-orange-700' :
-                    order.orderStatus === 'delivered' ? 'bg-green-100 text-green-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {order.orderStatus.replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-text-light">
-                  {new Date(order.createdAt).toLocaleDateString()}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  const [tab, setTab] = useState('All');
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<typeof sampleOrders[number] | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const tabs = ['All', 'Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'];
+  const orders = useMemo(() => sampleOrders.filter((order) => (tab === 'All' || statusLabel(order.orderStatus) === tab) && (!query || order.id.toLowerCase().includes(query.toLowerCase()) || order.customerName.toLowerCase().includes(query.toLowerCase()))), [query, tab]);
+  const openOrder = (order: typeof sampleOrders[number]) => { setSelected(order); setSelectedStatus(statusLabel(order.orderStatus)); };
+
+  return <VendorLayout title="Orders"><PageHeading title="Orders" description="Review, prepare, and track customer orders." /><section className="bg-white border border-[#eee5df] rounded-2xl overflow-hidden shadow-[0_4px_18px_rgba(74,43,28,0.04)]"><div className="p-5 border-b border-[#f1ebe7] flex flex-col gap-4"><div className="relative max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#ad9b91]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search order or customer" className="w-full h-11 rounded-xl border border-[#e7ddd7] pl-10 pr-4 text-sm" /></div><div className="flex gap-1 overflow-x-auto">{tabs.map((item) => <button key={item} onClick={() => setTab(item)} className={`px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap ${tab === item ? 'bg-[#6f3d27] text-white' : 'text-[#806e64] hover:bg-[#f7f1ed]'}`}>{item}</button>)}</div></div><div className="overflow-x-auto"><table className="w-full min-w-[760px]"><thead className="bg-[#fcfaf9] text-left text-[11px] uppercase tracking-wide text-[#9a887d]"><tr><th className="px-5 py-3">Order ID</th><th className="px-5 py-3">Customer</th><th className="px-5 py-3">Product</th><th className="px-5 py-3">Quantity</th><th className="px-5 py-3">Total</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Date</th><th className="px-5 py-3"></th></tr></thead><tbody>{orders.map((order) => <tr key={order.id} className="border-t border-[#f1ebe7] text-sm"><td className="px-5 py-4 font-semibold text-[#5f3928]">#{order.id.slice(-4)}</td><td className="px-5 py-4">{order.customerName}</td><td className="px-5 py-4 text-[#806e64]">{order.items[0]?.productName}</td><td className="px-5 py-4">{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td><td className="px-5 py-4 font-semibold"><Currency value={order.total} /></td><td className="px-5 py-4"><StatusBadge status={statusLabel(order.orderStatus)} /></td><td className="px-5 py-4 text-[#927f74]">{new Date(order.createdAt).toLocaleDateString('en-GH', { month: 'short', day: 'numeric' })}</td><td className="px-5 py-4"><button onClick={() => openOrder(order)} className="p-2 rounded-lg hover:bg-[#f7f1ed]" title="View order"><Eye className="w-4 h-4" /></button></td></tr>)}</tbody></table></div>{orders.length === 0 && <p className="p-10 text-center text-sm text-[#927f74]">No orders found.</p>}</section>{selected && <div className="fixed inset-0 z-50 bg-[#2d211b]/50 flex items-center justify-center p-4" onClick={() => setSelected(null)}><div className="bg-white rounded-2xl max-w-lg w-full p-6" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between"><div><p className="text-xs uppercase tracking-[0.16em] text-[#9a7968]">Order details</p><h2 className="text-xl font-bold mt-1">#{selected.id.slice(-4)}</h2></div><button onClick={() => setSelected(null)} aria-label="Close"><X className="w-5 h-5" /></button></div><div className="mt-6 space-y-4 text-sm"><div className="flex justify-between"><span className="text-[#927f74]">Customer</span><strong>{selected.customerName}</strong></div><div className="flex justify-between"><span className="text-[#927f74]">Phone</span><strong>{selected.customerPhone}</strong></div><div className="flex justify-between"><span className="text-[#927f74]">Delivery</span><span>{selected.deliveryAddress.city}, {selected.deliveryAddress.region}</span></div><div className="flex justify-between"><span className="text-[#927f74]">Total</span><strong><Currency value={selected.total} /></strong></div><div className="border-t border-[#f1ebe7] pt-4"><p className="font-semibold mb-2">Ordered products</p>{selected.items.map((item) => <div key={item.productId} className="flex justify-between text-[#806e64] py-1"><span>{item.productName} × {item.quantity}</span><Currency value={item.price * item.quantity} /></div>)}</div><div className="border-t border-[#f1ebe7] pt-4"><p className="font-semibold mb-3">Update order status</p><div className="grid grid-cols-2 gap-2">{nextStatuses.map((status) => <button key={status} onClick={() => setSelectedStatus(status)} className={`rounded-lg px-3 py-2 text-xs font-semibold border ${selectedStatus === status ? 'bg-[#6f3d27] text-white border-[#6f3d27]' : 'border-[#e7ddd7] text-[#806e64]'}`}>{status === 'Pending' ? 'Accept Order' : status}</button>)}</div><p className="text-xs text-[#927f74] mt-3">Current selection: <strong>{selectedStatus}</strong></p></div></div></div></div>}</VendorLayout>;
 };
