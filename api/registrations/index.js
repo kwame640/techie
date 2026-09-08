@@ -16,11 +16,11 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const { id } = req.query;
       if (id) {
-        const registration = getRegistrationById(id);
+        const registration = await getRegistrationById(id);
         if (!registration) return res.status(404).json({ success: false, error: 'Not found' });
         return res.status(200).json({ success: true, registration: { ...registration, images: [] } });
       }
-      const registrations = getAllRegistrations();
+      const registrations = await getAllRegistrations();
       const withCount = registrations.map(reg => ({ ...reg, imageCount: 0 }));
       return res.status(200).json({ success: true, registrations: withCount });
     }
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       const { id } = req.query;
       const { status } = req.body || {};
       if (!id || !status) return res.status(400).json({ success: false, error: 'id and status required' });
-      const updated = updateRegistrationStatus(id, status);
+      const updated = await updateRegistrationStatus(id, status);
       if (!updated) return res.status(404).json({ success: false, error: 'Not found' });
       return res.status(200).json({ success: true, registration: updated });
     }
