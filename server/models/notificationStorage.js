@@ -1,5 +1,6 @@
 const GIST_ID = process.env.GIST_ID || '';
 const API_BASE = 'https://api.github.com';
+const NOTIF_FILE = 'notifications.json';
 
 function getHeaders() {
   return {
@@ -9,11 +10,8 @@ function getHeaders() {
   };
 }
 
-async function readNotifications() {
-  if (!GIST_ID) {
-    const { default: local } = await import('./localNotifications.js');
-    return local.getAll();
-  }
+async function readGist() {
+  if (!GIST_ID) return [];
   const res = await fetch(`${API_BASE}/gists/${GIST_ID}`, {
     headers: getHeaders(),
     cache: 'no-store',
@@ -24,7 +22,7 @@ async function readNotifications() {
     throw new Error(`Gist read failed (${res.status}): ${err}`);
   }
   const data = await res.json();
-  const file = data.files && data.files['notifications.json'];
+  const file = data.files && data.files[NOTIF_FILE];
   if (!file) return [];
   try {
     const content = JSON.parse(file.content);
@@ -34,7 +32,7 @@ async function readNotifications() {
   }
 }
 
-async function writeNotifications(content) {
+async function writeGist(content) {
   if (!GIST_ID) {
     const { default: local } = await import('./localNotifications.js');
     await local.setAll(content);
@@ -48,7 +46,7 @@ async function writeNotifications(content) {
     },
     body: JSON.stringify({
       files: {
-        'notifications.json': {
+        [NOTIF_FILE]: {
           content: JSON.stringify(content, null, 2),
         },
       },
@@ -63,7 +61,8 @@ async function writeNotifications(content) {
 
 export async function getAllNotifications() {
   try {
-    return await readNotifications();
+    const all = await readGist();
+    return all;
   } catch (e) {
     console.error('getAllNotifications error:', e.message);
     return [];
@@ -81,7 +80,7 @@ export async function getNotificationById(id) {
 }
 
 export async function createNotification(data) {
-  const all = await readNotifications();
+  const all = await readGist();
   const newNotification = {
     id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
     title: data.title,
@@ -93,31 +92,31 @@ export async function createNotification(data) {
   };
   all.unshift(newNotification);
   const limited = all.slice(0, 100);
-  await writeNotifications(limited);
+  await writeGist(limited);
   return newNotification;
 }
 
 export async function markAsRead(id) {
-  const all = await readNotifications();
+  const all = await readGist();
   const index = all.findIndex(n => n.id === id);
   if (index === -1) return null;
   all[index].read = true;
   all[index].readAt = new Date().toISOString();
-  await writeNotifications(all);
+  await writeGist(all);
   return all[index];
 }
 
 export async function markAllAsRead() {
-  const all = await readNotifications();
+  const all = await readGist();
   const updated = all.map(n => ({ ...n, read: true, readAt: new Date().toISOString() }));
-  await writeNotifications(updated);
+  await writeGist(updated);
   return updated;
 }
 
 export async function deleteNotification(id) {
-  const all = await readNotifications();
+  const all = await readGist();
   const filtered = all.filter(n => n.id !== id);
-  await writeNotifications(filtered);
+  await writeGist(filtered);
   return true;
 }
 
