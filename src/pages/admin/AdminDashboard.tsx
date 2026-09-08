@@ -49,7 +49,7 @@ export const AdminDashboard = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'Approved' | 'Pending' | 'Rejected' | 'Suspended' | 'All'>('Approved');
+  const [statusFilter, setStatusFilter] = useState<'Approved' | 'Pending' | 'Rejected' | 'Suspended' | 'All'>('All');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -374,8 +374,14 @@ export const AdminDashboard = () => {
           <div className="p-6 border-b">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-text">Approved Vendors</h2>
-                <p className="text-sm text-text-light mt-1">Only approved vendors can enter the NKAY Vendor Dashboard.</p>
+                <h2 className="text-lg font-semibold text-text">
+                  {statusFilter === 'All' ? 'All Registrations' : `${statusFilter} Vendors`}
+                </h2>
+                <p className="text-sm text-text-light mt-1">
+                  {statusFilter === 'All'
+                    ? 'View all business registrations in one place.'
+                    : 'Only approved vendors can enter the NKAY Vendor Dashboard.'}
+                </p>
               </div>
               <select
                 value={statusFilter}
