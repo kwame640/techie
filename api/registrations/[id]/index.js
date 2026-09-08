@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   try {
-    const { getRegistrationById, updateRegistrationStatus } = await import('../../../server/models/firestoreRegistrationModel.js');
+    const { getRegistrationById, updateRegistrationStatus } = await import('../../../server/models/githubStorage.js');
 
     if (req.method === 'GET') {
       const registration = await getRegistrationById(id);
