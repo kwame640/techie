@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Search, User, MapPin, Star, Truck, Store,
+  Search, MapPin, Star, Truck, Store, User,
   ArrowRight, Heart, Home, Grid3x3, Building2,
-  ShoppingCart, Package, ShoppingBag, User as UserIcon, Menu,
+  ShoppingCart, Package, ShoppingBag, User as UserIcon, Menu, MessageCircle,
   Check, CreditCard, Facebook, Instagram, Twitter, Linkedin, Globe,
 } from 'lucide-react';
 import { sampleBusinesses, businessCategories, sampleProducts } from '../../data/marketplaceData';
@@ -266,9 +266,9 @@ export const MarketplaceHome = () => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-            <Link to="/login" className="hidden sm:inline-flex items-center gap-2 bg-primary text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium hover:bg-primary/90 transition whitespace-nowrap">
-              <User className="w-4 h-4" />
-              Sign In
+            <Link to="#contact" className="hidden sm:inline-flex items-center gap-2 bg-primary text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium hover:bg-primary/90 transition whitespace-nowrap">
+              <MessageCircle className="w-4 h-4" />
+              Contact Us
             </Link>
             <button className="lg:hidden p-2 rounded-xl hover:bg-accent-beige transition-colors">
               <Menu className="w-5 h-5 text-text-light" />
@@ -329,11 +329,6 @@ export const MarketplaceHome = () => {
                   <p className="text-xs sm:text-sm text-text-light">
                     Discover amazing businesses, products and services in your area.
                   </p>
-                </div>
-                <div className="flex items-center gap-2 bg-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl shadow-card border border-gray-100 flex-shrink-0">
-                  <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
-                  <span className="font-medium text-text text-xs sm:text-sm">Accra</span>
-                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-text-light rotate-90" />
                 </div>
               </div>
             </section>
@@ -739,6 +734,19 @@ export const MarketplaceHome = () => {
           </div>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Button */}
+      <a
+        href="https://wa.me/552951226"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Chat with NKAY on WhatsApp"
+        className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-[60] w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-lg shadow-[#25D366]/30 hover:scale-110 transition-transform duration-200"
+      >
+        <svg viewBox="0 0 32 32" className="w-6 h-6 sm:w-7 sm:h-7" fill="currentColor" aria-hidden="true">
+          <path d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.959 8.959 0 0 1-1.72-5.193c0-4.917 3.976-8.892 8.892-8.892 2.371 0 4.587.929 6.256 2.604 1.67 1.675 2.603 3.888 2.603 6.249 0 4.917-3.976 8.893-8.892 8.893zm4.922-17.889C19.79 4.512 16.66 3.626 13.38 3.627 7.754 3.627 3.176 8.205 3.175 13.832c0 2.105.597 4.15 1.723 5.906L1 29l9.476-1.762a10.2 10.2 0 0 0 5.906 1.83h.002c5.627 0 10.205-4.578 10.206-10.206 0-2.76-1.077-5.35-3.03-7.3z"/>
+        </svg>
+      </a>
     </div>
   );
 };
