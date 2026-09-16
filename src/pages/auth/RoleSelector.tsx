@@ -98,7 +98,7 @@ export const RoleSelector = () => {
             </div>
 
           <div 
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/business/register')}
             className="bg-white rounded-2xl p-8 shadow-card hover:shadow-soft transition cursor-pointer text-center"
           >
             <div className="p-4 bg-accent-beige rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">

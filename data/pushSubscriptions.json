@@ -1,0 +1,46 @@
+[
+  {
+    "email": "godfreda938@gmail.com",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dkxG-BhMTOU:APA91bF59H_l6aPU9e0OO-BTfkDOmIuGFg5VD5eohf7-Nfk-0up_MV1LbyVpy80a7-rol8jBTxRN0aJskwdz_GK3vXE8-znJgMeF2eE5Qwo6quPst1AvfezaKC1jJ1J-6JzCeVXpEVG5",
+    "keys": {
+      "p256dh": "BECaRJwwdTXig5QQ18Fb3MT7kDh4JfCY0LznF42bPQ_zx5gIEucMuCWXp50f0DNA99p9GaYXTD5Iq7BPMkrDXFk",
+      "auth": "95tIorB7NOCa1HcdDqSOGQ"
+    },
+    "p256dh": "BECaRJwwdTXig5QQ18Fb3MT7kDh4JfCY0LznF42bPQ_zx5gIEucMuCWXp50f0DNA99p9GaYXTD5Iq7BPMkrDXFk",
+    "auth": "95tIorB7NOCa1HcdDqSOGQ",
+    "updatedAt": "2026-09-12T06:41:05.354Z"
+  },
+  {
+    "email": "test@nkay.com",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/test123",
+    "keys": {
+      "p256dh": "BTest12345678901234567890123456789012345678901234567890123456789012",
+      "auth": "testauth1234567890ab"
+    },
+    "p256dh": "BTest12345678901234567890123456789012345678901234567890123456789012",
+    "auth": "testauth1234567890ab",
+    "updatedAt": "2026-09-12T06:28:47.468Z"
+  },
+  {
+    "email": "verify@test.com",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/v1",
+    "keys": {
+      "p256dh": "BTest12345678901234567890123456789012345678901234567890123456789012",
+      "auth": "testauth1234567890ab"
+    },
+    "p256dh": "BTest12345678901234567890123456789012345678901234567890123456789012",
+    "auth": "testauth1234567890ab",
+    "updatedAt": "2026-09-12T06:38:49.162Z"
+  },
+  {
+    "email": "doee3112@gmail.com",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dkxG-BhMTOU:APA91bF59H_l6aPU9e0OO-BTfkDOmIuGFg5VD5eohf7-Nfk-0up_MV1LbyVpy80a7-rol8jBTxRN0aJskwdz_GK3vXE8-znJgMeF2eE5Qwo6quPst1AvfezaKC1jJ1J-6JzCeVXpEVG5",
+    "keys": {
+      "p256dh": "BECaRJwwdTXig5QQ18Fb3MT7kDh4JfCY0LznF42bPQ_zx5gIEucMuCWXp50f0DNA99p9GaYXTD5Iq7BPMkrDXFk",
+      "auth": "95tIorB7NOCa1HcdDqSOGQ"
+    },
+    "p256dh": "BECaRJwwdTXig5QQ18Fb3MT7kDh4JfCY0LznF42bPQ_zx5gIEucMuCWXp50f0DNA99p9GaYXTD5Iq7BPMkrDXFk",
+    "auth": "95tIorB7NOCa1HcdDqSOGQ",
+    "updatedAt": "2026-09-13T08:17:08.011Z"
+  }
+]

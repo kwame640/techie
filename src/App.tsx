@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ShopProvider } from './context/ShopContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -18,7 +18,7 @@ import { LaunchCountdown } from './components/LaunchCountdown';
 // Business Pages
 import { BusinessDashboard } from './pages/business/BusinessDashboard';
 import { BusinessRegistration } from './pages/business/BusinessRegistration';
-import { MyStore } from './pages/business/MyStore';
+import { EditStore } from './pages/business/EditStore';
 import { AddProduct, ProductManagement } from './pages/business/ProductManagement';
 import { OrderManagement } from './pages/business/OrderManagement';
 import { CustomerManagement } from './pages/business/CustomerManagement';
@@ -29,11 +29,9 @@ import { ReviewsManagement } from './pages/business/ReviewsManagement';
 import { PromotionsManagement } from './pages/business/PromotionsManagement';
 import { NotificationCenter } from './pages/business/NotificationCenter';
 import { BusinessSettings } from './pages/business/BusinessSettings';
-import { MediaManagement } from './pages/business/MediaManagement';
 
 // Admin Pages
 import { AdminDashboard } from './pages/admin/AdminDashboard';
-import { VendorDashboard } from './pages/vendor/VendorDashboard';
 
 // Driver Pages
 import { DriverDashboard } from './pages/driver/DriverDashboard';
@@ -43,6 +41,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RoleSelector } from './pages/auth/RoleSelector';
 import { BusinessLoginPage } from './pages/auth/BusinessLoginPage';
 import { AdminLogin } from './pages/auth/AdminLogin';
+import { VendorLoginPage } from './pages/auth/VendorLoginPage';
 
 // Launch Countdown Page - shows only the banner (non-closable)
 const LaunchCountdownPage: React.FC = () => {
@@ -87,6 +86,57 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
   return <>{children}</>;
 };
 
+// Protected route that verifies the vendor session with the BACKEND.
+// The frontend is NEVER the final authority — the backend
+// (/api/vendor/session) re-checks the signed token and the live approval
+// status stored in the database on every request.
+const BusinessProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { business, isLoading: contextLoading, verifyVendorSession } = useAuth();
+  const [sessionValid, setSessionValid] = useState<boolean | null>(null);
+  const navigate = useNavigate();
+
+  const hasToken = typeof localStorage !== 'undefined' && !!localStorage.getItem('vendorToken');
+
+  useEffect(() => {
+    if (contextLoading || sessionValid !== null) return;
+
+    if (!hasToken) {
+      setSessionValid(false);
+      navigate('/business/login', { replace: true });
+      return;
+    }
+
+    if (business) {
+      setSessionValid(true);
+      return;
+    }
+
+    verifyVendorSession().then((verified) => {
+      setSessionValid(verified);
+      if (!verified) {
+        navigate('/business/login', { replace: true });
+      }
+    });
+  }, [contextLoading, business, hasToken, sessionValid, navigate, verifyVendorSession]);
+
+  if (contextLoading || sessionValid === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-text-light">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionValid) {
+    return <Navigate to="/business/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 function App() {
   return (
     <ShopProvider>
@@ -101,14 +151,23 @@ function App() {
           <Route path="/business/register" element={<BusinessRegistration />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/vendor-dashboard" element={<VendorDashboard />} />
+          <Route path="/vendor-login" element={<VendorLoginPage />} />
+          <Route path="/vendor-dashboard" element={<Navigate to="/business/dashboard" replace />} />
 
           {/* Customer Routes */}
           <Route path="/" element={<MarketplaceHome />} />
           <Route path="/launch" element={<LaunchCountdownPage />} />
-          <Route path="/discover" element={<BusinessDiscovery />} />
-          <Route path="/store/:storeId" element={<StorePage />} />
-          <Route path="/product/:productId" element={<ProductPage />} />
+           <Route path="/discover" element={<BusinessDiscovery />} />
+           <Route
+             path="/store/biz-4"
+             element={
+               <BusinessProtectedRoute>
+                 <StorePage />
+               </BusinessProtectedRoute>
+             }
+           />
+           <Route path="/store/:storeId" element={<StorePage />} />
+           <Route path="/product/:productId" element={<ProductPage />} />
           <Route 
             path="/customer/cart" 
             element={
@@ -138,117 +197,110 @@ function App() {
             } 
           />
 
-          {/* Business Routes */}
+          {/* Business Routes - all protected by BusinessProtectedRoute
+              which verifies the vendor session with the backend */}
           <Route 
             path="/business/dashboard" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <BusinessDashboard />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
-          <Route 
-            path="/business/store" 
-            element={
-              <ProtectedRoute allowedRoles={['business']}>
-                <MyStore />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/business/media" 
-            element={
-              <ProtectedRoute allowedRoles={['business']}>
-                <MediaManagement />
-              </ProtectedRoute>
-            } 
+           <Route
+             path="/business/store"
+             element={
+              <BusinessProtectedRoute>
+                <EditStore />
+              </BusinessProtectedRoute>
+            }
           />
           <Route 
             path="/business/products" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <ProductManagement />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/products/add" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <AddProduct />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/orders" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <OrderManagement />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/customers" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <CustomerManagement />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/delivery" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <DeliveryCenter />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/earnings" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <EarningsDashboard />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/analytics" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <AnalyticsDashboard />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/reviews" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <ReviewsManagement />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/promotions" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <PromotionsManagement />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/notifications" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <NotificationCenter />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
           <Route 
             path="/business/settings" 
             element={
-              <ProtectedRoute allowedRoles={['business']}>
+              <BusinessProtectedRoute>
                 <BusinessSettings />
-              </ProtectedRoute>
+              </BusinessProtectedRoute>
             } 
           />
 
@@ -268,7 +320,7 @@ function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        </Router>
+          </Router>
         </NotificationProvider>
       </AuthProvider>
     </ShopProvider>
@@ -276,3 +328,4 @@ function App() {
 }
 
 export default App;
+

@@ -35,10 +35,21 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') || localStorage.getItem('adminToken') || '' : '';
 
   const fetchNotifications = async () => {
+    if (!token) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/notifications', {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok) {
+        setIsLoading(false);
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setNotifications(data.notifications || []);

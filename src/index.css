@@ -3,19 +3,36 @@
 @tailwind utilities;
 
 @layer base {
-  body {
+  html, body, #root {
     @apply bg-background text-text;
     font-family: 'Inter', system-ui, sans-serif;
+    overflow-x: hidden;
   }
-  
+
   html {
     scroll-behavior: smooth;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  img {
+    max-width: 100%;
+    display: block;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 

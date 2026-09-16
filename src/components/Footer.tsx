@@ -8,24 +8,16 @@ export const Footer: React.FC = () => {
   const footerLinks = {
     shop: [
       { name: 'All Products', href: '#' },
-      { name: 'New Arrivals', href: '#' },
       { name: 'Best Sellers', href: '#' },
       { name: 'Sale', href: '#' },
-      { name: 'Categories', href: '#' }
     ],
     customerService: [
-      { name: 'Contact Us', href: '#' },
       { name: 'FAQ', href: '#' },
-      { name: 'Shipping Info', href: '#' },
       { name: 'Returns', href: '#' },
       { name: 'Track Order', href: '#' }
     ],
     about: [
       { name: 'Our Story', href: '#' },
-      { name: 'Careers', href: '#' },
-      { name: 'Press', href: '#' },
-      { name: 'Blog', href: '#' },
-      { name: 'Sustainability', href: '#' }
     ],
     followUs: [
       { name: 'Facebook', href: '#', icon: Facebook },

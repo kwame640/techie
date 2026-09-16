@@ -58,6 +58,28 @@ export async function createRegistration(data) {
   return registration;
 }
 
+export async function createRegistrationWithId(id, data) {
+  const database = getDatabase();
+  if (!database) return localModel.createRegistrationWithId(id, data);
+
+  const reference = database.collection(collectionName).doc(id);
+  const document = await reference.get();
+
+  if (document.exists) {
+    return updateRegistration(id, data);
+  }
+
+  const registration = {
+    id,
+    ...data,
+    status: data.status || 'Pending',
+    registrationDate: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await reference.set(registration);
+  return registration;
+}
+
 export async function updateRegistrationStatus(id, status) {
   const database = getDatabase();
   if (!database) return localModel.updateRegistrationStatus(id, status);
@@ -69,6 +91,23 @@ export async function updateRegistrationStatus(id, status) {
   const updated = {
     ...document.data(),
     status,
+    updatedAt: new Date().toISOString(),
+  };
+  await reference.set(updated);
+  return updated;
+}
+
+export async function updateRegistration(id, updates) {
+  const database = getDatabase();
+  if (!database) return localModel.updateRegistration(id, updates);
+
+  const reference = database.collection(collectionName).doc(id);
+  const document = await reference.get();
+  if (!document.exists) return null;
+
+  const updated = {
+    ...document.data(),
+    ...updates,
     updatedAt: new Date().toISOString(),
   };
   await reference.set(updated);

@@ -66,10 +66,10 @@ export const AdminDashboard = () => {
   const fetchData = async () => {
     try {
       const [regRes, statsRes] = await Promise.all([
-        fetch('/api/registrations', {
+        fetch('/api/admin/registrations', {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch('/api/stats', {
+        fetch('/api/admin/stats', {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -88,7 +88,7 @@ export const AdminDashboard = () => {
 
   const fetchRegistrationDetails = async (id: string) => {
     try {
-      const response = await fetch(`/api/registrations/${id}`, {
+      const response = await fetch(`/api/admin/registrations/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
@@ -103,7 +103,7 @@ export const AdminDashboard = () => {
 
   const handleStatusChange = async (id: string, status: 'Pending' | 'Approved' | 'Rejected' | 'Suspended') => {
     try {
-      const response = await fetch(`/api/registrations/${id}`, {
+      const response = await fetch(`/api/admin/registrations/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -127,7 +127,7 @@ export const AdminDashboard = () => {
     if (!confirm('Are you sure you want to delete this image?')) return;
 
     try {
-      const response = await fetch(`/api/images/${imageId}`, {
+      const response = await fetch(`/api/admin/images/${imageId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -175,7 +175,7 @@ export const AdminDashboard = () => {
     try {
       const imagesPayload = await Promise.all(fileArray.map(readFileAsDataUrl));
 
-      const response = await fetch('/api/images/upload', {
+      const response = await fetch('/api/admin/images/upload', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -271,9 +271,11 @@ export const AdminDashboard = () => {
     });
   };
 
-  const visibleRegistrations = statusFilter === 'All'
-    ? registrations
-    : registrations.filter((registration) => registration.status === statusFilter);
+  const visibleRegistrations = statusFilter === 'Approved'
+    ? registrations.filter((registration) => registration.status === 'Approved')
+    : statusFilter === 'All'
+      ? registrations
+      : registrations.filter((registration) => registration.status === statusFilter);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -305,7 +307,7 @@ export const AdminDashboard = () => {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/vendor-dashboard')}
+              onClick={() => navigate('/vendor-login')}
               className="inline-flex items-center gap-2 bg-primary text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition"
             >
               <CheckCircle className="w-4 h-4" />
@@ -375,12 +377,10 @@ export const AdminDashboard = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-text">
-                  {statusFilter === 'All' ? 'All Registrations' : `${statusFilter} Vendors`}
+                  Approved Vendors
                 </h2>
                 <p className="text-sm text-text-light mt-1">
-                  {statusFilter === 'All'
-                    ? 'View all business registrations in one place.'
-                    : 'Only approved vendors can enter the NKAY Vendor Dashboard.'}
+                  Only approved vendors can enter the NKAY Vendor Dashboard.
                 </p>
               </div>
               <select
@@ -388,11 +388,11 @@ export const AdminDashboard = () => {
                 onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
                 className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
               >
+                <option value="All">All vendors</option>
                 <option value="Approved">Approved only</option>
                 <option value="Pending">Pending applications</option>
                 <option value="Rejected">Rejected</option>
                 <option value="Suspended">Suspended</option>
-                <option value="All">All registrations</option>
               </select>
             </div>
           </div>

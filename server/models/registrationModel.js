@@ -50,6 +50,11 @@ export function getRegistrationById(id) {
   return registrations.find(r => r.id === id) || null;
 }
 
+export function getRegistrationByEmail(email) {
+  const registrations = readDb();
+  return registrations.find(r => String(r.email || '').toLowerCase() === String(email || '').toLowerCase()) || null;
+}
+
 export function createRegistration(data) {
   const registrations = readDb();
   const newRegistration = {
@@ -57,6 +62,24 @@ export function createRegistration(data) {
     ...data,
     status: 'Pending',
     registrationDate: new Date().toISOString(),
+  };
+  registrations.unshift(newRegistration);
+  writeDb(registrations);
+  return newRegistration;
+}
+
+export function createRegistrationWithId(id, data) {
+  const registrations = readDb();
+  const existing = registrations.find(r => r.id === id);
+  if (existing) {
+    return updateRegistration(id, data);
+  }
+  const newRegistration = {
+    id,
+    ...data,
+    status: data.status || 'Pending',
+    registrationDate: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
   registrations.unshift(newRegistration);
   writeDb(registrations);
@@ -71,6 +94,21 @@ export function updateRegistrationStatus(id, status) {
   }
   registrations[index].status = status;
   registrations[index].updatedAt = new Date().toISOString();
+  writeDb(registrations);
+  return registrations[index];
+}
+
+export function updateRegistration(id, updates) {
+  const registrations = readDb();
+  const index = registrations.findIndex(r => r.id === id);
+  if (index === -1) {
+    return null;
+  }
+  registrations[index] = {
+    ...registrations[index],
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
   writeDb(registrations);
   return registrations[index];
 }

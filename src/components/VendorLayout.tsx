@@ -1,8 +1,7 @@
-import { ReactNode, useState, useRef, useEffect } from 'react';
+import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Image, LayoutDashboard, LogOut, Menu, Package, Settings, ShoppingBag, Store, Wallet, X } from 'lucide-react';
+import { LayoutDashboard, LogOut, Menu, Package, Settings, ShoppingBag, Store, Wallet, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useNotifications } from '../context/NotificationContext';
 import logoImage from '../images/nkay.png';
 
 const navigation = [
@@ -11,9 +10,7 @@ const navigation = [
   { label: 'Orders', path: '/business/orders', icon: ShoppingBag },
   { label: 'Earnings', path: '/business/earnings', icon: Wallet },
   { label: 'Store', path: '/business/store', icon: Store },
-  { label: 'Media', path: '/business/media', icon: Image },
   { label: 'Settings', path: '/business/settings', icon: Settings },
-  { label: 'Notifications', path: '/business/notifications', icon: Bell },
 ];
 
 export const VendorLayout = ({ children, title }: { children: ReactNode; title?: string }) => {
@@ -21,23 +18,8 @@ export const VendorLayout = ({ children, title }: { children: ReactNode; title?:
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const name = business?.name || 'Your Store';
   const initials = name.split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase();
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-        setNotifOpen(false);
-      }
-    };
-    if (notifOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [notifOpen]);
 
   const signOut = async () => {
     await logout();
@@ -70,65 +52,6 @@ export const VendorLayout = ({ children, title }: { children: ReactNode; title?:
             {title && <div className="hidden sm:block border-l border-[#e9dfd8] pl-4 text-sm font-medium text-[#6e5a4e]">{title}</div>}
           </div>
           <div className="flex items-center gap-4">
-            <div ref={notifRef} className="relative">
-              <button
-                onClick={() => setNotifOpen(!notifOpen)}
-                className="relative p-2 text-[#806c61] hover:text-[#3f2418] rounded-lg hover:bg-[#f7f1ed] transition"
-                aria-label="Notifications"
-              >
-                <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-[#b94c3d] rounded-full">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </button>
-              {notifOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border border-[#eee5df] rounded-xl shadow-lg overflow-hidden z-50">
-                  <div className="p-3 border-b border-[#f1ebe7] flex items-center justify-between">
-                    <h4 className="font-semibold text-sm text-text">Notifications</h4>
-                    {unreadCount > 0 && (
-                      <button
-                        onClick={() => { markAllAsRead(); setNotifOpen(false); }}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Mark all read
-                      </button>
-                    )}
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-text-light">No notifications</div>
-                    ) : (
-                      notifications.slice(0, 5).map(n => (
-                        <div
-                          key={n.id}
-                          className={`p-3 border-b border-[#f1ebe7] last:border-0 cursor-pointer hover:bg-[#faf8f6] transition ${!n.read ? 'bg-primary/5' : ''}`}
-                          onClick={() => { markAsRead(n.id); setNotifOpen(false); navigate('/business/notifications'); }}
-                        >
-                          <div className="flex items-start gap-2">
-                            <span className="text-sm mt-0.5">{n.type === 'order' ? '🛒' : n.type === 'approval' ? '✅' : n.type === 'warning' ? '⚠️' : '🔔'}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-medium ${!n.read ? 'text-primary' : 'text-text'}`}>{n.title}</p>
-                              <p className="text-xs text-text-light mt-0.5 line-clamp-1">{n.message}</p>
-                              <p className="text-[10px] text-text-light mt-1">{new Date(n.createdAt).toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit' })}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <div className="p-2 border-t border-[#f1ebe7]">
-                    <button
-                      onClick={() => { setNotifOpen(false); navigate('/business/notifications'); }}
-                      className="w-full text-center text-sm text-primary font-medium py-1.5 hover:bg-[#f6f8f6] rounded-lg transition"
-                    >
-                      View all
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
             <div className="hidden sm:flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-[#ead9ce] text-[#6b3926] flex items-center justify-center text-xs font-bold">{initials}</div>
               <span className="text-sm font-medium max-w-32 truncate">{name}</span>

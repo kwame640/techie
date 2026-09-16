@@ -5,7 +5,18 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:3001',
+      '/api/vendor-login.php': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+       '/api': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+      },
     },
   },
 })

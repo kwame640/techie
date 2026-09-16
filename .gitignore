@@ -8,3 +8,6 @@ package-lock.json
 .kilo/
 /uploads/business-images/*
 !/uploads/business-images/.gitkeep
+
+.vercel
+.env*

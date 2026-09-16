@@ -1,11 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  TrendingUp, 
-  Package, 
-  ShoppingBag, 
-  Truck, 
+import {
+  TrendingUp,
+  Package,
+  ShoppingBag,
+  Truck,
   DollarSign,
-  Bell
 } from 'lucide-react';
 
 export const BusinessMobileNav = () => {
@@ -39,16 +38,6 @@ export const BusinessMobileNav = () => {
             </Link>
           );
         })}
-        <Link
-          to="/business/notifications"
-          className="flex flex-col items-center py-2 px-3 rounded-lg transition text-text-light"
-        >
-          <div className="relative">
-            <Bell className="w-5 h-5 mb-1" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </div>
-          <span className="text-xs">Alerts</span>
-        </Link>
       </div>
     </nav>
   );
