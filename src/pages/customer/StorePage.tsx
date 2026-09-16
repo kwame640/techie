@@ -6,6 +6,7 @@ import {
   ArrowLeft, Package, AlertCircle,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
+import { safeFetchJson } from '../../lib/fetch';
 import { sampleBusinesses, sampleProducts } from '../../data/marketplaceData';
 import { Business, Product as MarketplaceProduct } from '../../types/marketplace';
 import type { Product as ShopProduct } from '../../types';
@@ -59,8 +60,15 @@ export const StorePage = () => {
         setBusiness(found);
       } else {
         try {
-          const res = await fetch(`/api/registrations/${storeId}`);
-          const data = await res.json();
+          const result = await safeFetchJson<any>(`/api/registrations/${storeId}`, {
+            parseErrorMessage: 'NKAY server returned non-JSON for this store page. The business may be unavailable. Please try again later.',
+          });
+          if (!result.success) {
+            console.warn(`StorePage /api/registrations/${storeId} non-JSON:`, result.status, result.parseError?.slice(0, 220));
+            setSearched(true);
+            return;
+          }
+          const data = result.data;
           if (data.success && data.registration) {
             const reg = data.registration;
             const mapped: Business = {

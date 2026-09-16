@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Store, Mail, Phone, MapPin, Check } from 'lucide-react';
 import logoImage from '../../images/nkay.png';
+import { safeFetchJson } from '../../lib/fetch';
 
 export const BusinessRegistration = () => {
   const navigate = useNavigate();
@@ -42,22 +43,25 @@ export const BusinessRegistration = () => {
     setIsUploading(true);
 
     try {
-      const response = await fetch('/api/business/register', {
+      const result = await safeFetchJson<any>('/api/business/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
+      if (!result.success) {
+        alert(result.parseError || 'Registration failed. Please try again.');
+        return;
+      }
+      const { data: resultData } = result;
 
-      const result = await response.json();
-
-      if (result.success) {
+      if (resultData.success) {
         setIsSuccess(true);
       } else {
-        alert(result.error || 'Registration failed. Please try again.');
+        alert(resultData.error || 'Registration failed. Please try again.');
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      alert('Registration failed. Please try again.');
+      alert(error?.message || 'Registration failed. Please try again.');
     } finally {
       setIsUploading(false);
     }

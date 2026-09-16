@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { safeFetchJson } from '../lib/fetch';
 
 interface Notification {
   id: string;
@@ -43,14 +44,18 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const res = await fetch('/api/notifications', {
+      const result = await safeFetchJson<any>('/api/notifications', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) {
+      if (!result.success) {
         setIsLoading(false);
         return;
       }
-      const data = await res.json();
+      const { response, data } = result;
+      if (!response.ok) {
+        setIsLoading(false);
+        return;
+      }
       if (data.success) {
         setNotifications(data.notifications || []);
         setUnreadCount(data.notifications.filter((n: Notification) => !n.read).length);

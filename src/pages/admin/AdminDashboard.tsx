@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Clock, CheckCircle, XCircle, LogOut, Eye, ChevronLeft, ChevronRight, X, Trash2, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
 import logoImage from '../../images/nkay.png';
+import { safeFetchJson } from '../../lib/fetch';
 
 interface BusinessImage {
   id: string;
@@ -65,20 +66,17 @@ export const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [regRes, statsRes] = await Promise.all([
-        fetch('/api/admin/registrations', {
+      const [regResult, statsResult] = await Promise.all([
+        safeFetchJson<any>('/api/admin/registrations', {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch('/api/admin/stats', {
+        safeFetchJson<any>('/api/admin/stats', {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
 
-      const regData = await regRes.json();
-      const statsData = await statsRes.json();
-
-      if (regData.success) setRegistrations(regData.registrations);
-      if (statsData.success) setStats(statsData.stats);
+      if (regResult.success && regResult.data.success) setRegistrations(regResult.data.registrations);
+      if (statsResult.success && statsResult.data.success) setStats(statsResult.data.stats);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -88,10 +86,11 @@ export const AdminDashboard = () => {
 
   const fetchRegistrationDetails = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/registrations/${id}`, {
+      const result = await safeFetchJson<any>(`/api/admin/registrations/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await response.json();
+      if (!result.success) throw new Error(result.parseError || 'Unable to load registration');
+      const { data } = result;
       if (data.success) {
         setSelectedRegistration(data.registration);
         setSelectedImages(data.registration.images || []);
@@ -103,7 +102,7 @@ export const AdminDashboard = () => {
 
   const handleStatusChange = async (id: string, status: 'Pending' | 'Approved' | 'Rejected' | 'Suspended') => {
     try {
-      const response = await fetch(`/api/admin/registrations/${id}/status`, {
+      const result = await safeFetchJson<any>(`/api/admin/registrations/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -111,8 +110,9 @@ export const AdminDashboard = () => {
         },
         body: JSON.stringify({ status }),
       });
+      if (!result.success) throw new Error(result.parseError || 'Unable to update status');
 
-      const data = await response.json();
+      const { data } = result;
       if (data.success) {
         fetchData();
         setSelectedRegistration(null);
@@ -127,12 +127,13 @@ export const AdminDashboard = () => {
     if (!confirm('Are you sure you want to delete this image?')) return;
 
     try {
-      const response = await fetch(`/api/admin/images/${imageId}`, {
+      const result = await safeFetchJson<any>(`/api/admin/images/${imageId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!result.success) throw new Error(result.parseError || 'Unable to delete image');
 
-      const data = await response.json();
+      const { data } = result;
       if (data.success) {
         setSelectedImages(selectedImages.filter(img => img.id !== imageId));
         if (selectedRegistration) {
@@ -175,7 +176,7 @@ export const AdminDashboard = () => {
     try {
       const imagesPayload = await Promise.all(fileArray.map(readFileAsDataUrl));
 
-      const response = await fetch('/api/admin/images/upload', {
+      const result = await safeFetchJson<any>('/api/admin/images/upload', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,7 +188,8 @@ export const AdminDashboard = () => {
         }),
       });
 
-      const data = await response.json();
+      if (!result.success) throw new Error(result.parseError || 'Upload failed');
+      const { data } = result;
       if (data.success) {
         setSelectedImages([...selectedImages, ...data.images]);
         if (selectedRegistration) {

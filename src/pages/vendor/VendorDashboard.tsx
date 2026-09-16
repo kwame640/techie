@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import logoImage from '../../images/nkay.png';
+import { safeFetchJson } from '../../lib/fetch';
 
 interface BusinessImage {
   id: string;
@@ -104,10 +105,11 @@ export const VendorDashboard = () => {
     setLoadError('');
 
     try {
-      const response = await fetch('/api/registrations', {
+      const result = await safeFetchJson<any>('/api/registrations', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await response.json();
+      if (!result.success) throw new Error(result.parseError || 'Unable to load vendors');
+      const { response, data } = result;
       if (!response.ok || !data.success) throw new Error(data.error || 'Unable to load vendors');
       setVendors((data.registrations || []).filter((vendor: Registration) => vendor.status === 'Approved'));
     } catch (error) {
@@ -150,10 +152,11 @@ export const VendorDashboard = () => {
 
   const fetchVendorDetails = async (id: string) => {
     try {
-      const response = await fetch(`/api/registrations/${id}`, {
+      const result = await safeFetchJson<any>(`/api/registrations/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await response.json();
+      if (!result.success) throw new Error(result.parseError || 'Unable to load vendor');
+      const { data } = result;
       if (data.success) setSelectedVendor(data.registration);
     } catch (error) {
       console.error('Failed to fetch vendor details:', error);

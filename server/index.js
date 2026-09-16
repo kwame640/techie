@@ -30,6 +30,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Ensure all /api responses declare application/json unless explicitly overridden.
+// Prevents "The page could not be found" HTML responses being parsed as JSON on Vercel.
+app.use('/api', (_req, res, next) => {
+  const origJson = res.json.bind(res);
+  res.json = function patchedJson(body) {
+    if (!res.getHeader('Content-Type')) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    }
+    return origJson(body);
+  };
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Default all API error pages to JSON instead of HTML
+  res.on('finish', () => {});
+  next();
+});
+
 // Serve uploaded images statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

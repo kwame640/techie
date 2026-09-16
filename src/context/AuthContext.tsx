@@ -3,6 +3,7 @@ import { User } from '../types/marketplace';
 import { auth } from '../firebase';
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, signOutUser } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { safeFetchJson } from '../lib/fetch';
 
 interface AuthContextType {
   user: User | null;
@@ -97,15 +98,20 @@ const createUserData = (firebaseUser: any, role: 'customer' | 'business' | 'driv
 };
 
 const getApprovedBusiness = async (businessName: string, email: string) => {
-  const response = await fetch('/api/vendor/login', {
+  const result = await safeFetchJson<any>('/api/vendor/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ businessName, email }),
+    parseErrorMessage:
+      'NKAY vendor login service is unavailable right now. Please try again in a minute or refresh the page.',
   });
 
-  const data = await response.json();
+  if (!result.success) {
+    throw new Error(result.parseError || 'Vendor login failed: could not read response from NKAY servers.');
+  }
+  const data = result.data;
 
-  if (!response.ok || !data.success) {
+  if (!result.response.ok || !data.success) {
     const status = data.status;
     if (status === 'Suspended') {
       throw new Error('Store Suspended. Please contact NKAY support.');
@@ -167,16 +173,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
     try {
-      const res = await fetch('/api/vendor/session', {
+      const result = await safeFetchJson<any>('/api/vendor/session', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) {
+      if (!result.success || !result.response.ok) {
         localStorage.removeItem('vendorToken');
         localStorage.removeItem('vendorSession');
         setBusiness(null);
         return false;
       }
-      const data = await res.json();
+      const { data } = result;
       if (!data.success) {
         localStorage.removeItem('vendorToken');
         localStorage.removeItem('vendorSession');

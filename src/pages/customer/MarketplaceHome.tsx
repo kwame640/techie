@@ -11,6 +11,7 @@ import { products as shopProducts } from '../../data/products';
 import logoImage from '../../images/nkay.png';
 import { HomepageCarousel } from '../../components/HomepageCarousel';
 import { CompactProductCard, type CompactProduct } from '../../components/CompactProductCard';
+import { safeFetchJson } from '../../lib/fetch';
 
 const sidebarNav = [
   { name: 'Home', href: '/', icon: Home, active: true },
@@ -90,8 +91,14 @@ export const MarketplaceHome = () => {
   useEffect(() => {
     const fetchBusinesses = async () => {
       try {
-        const res = await fetch('/api/registrations');
-        const data = await res.json();
+        const result = await safeFetchJson<any>('/api/registrations', {
+          parseErrorMessage: 'NKAY server returned a non-JSON error page when loading businesses. Try reloading or check your internet.',
+        });
+        if (!result.success) {
+          console.warn('Homepage businesses fetch skipped (non-JSON):', result.status, result.parseError?.slice(0, 220));
+          return;
+        }
+        const data = result.data;
         if (data.success && data.registrations) {
           const mapped = data.registrations.map((reg: any) => ({
             id: reg.id,

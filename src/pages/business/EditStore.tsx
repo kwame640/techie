@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { PageHeading, VendorLayout } from '../../components/VendorLayout';
+import { safeFetchJson } from '../../lib/fetch';
 
 interface BusinessData {
   id: string;
@@ -92,14 +93,15 @@ export const EditStore = () => {
       if (!business?.id) return;
       setLoading(true);
       try {
-        const res = await fetch(`/api/business/${business.id}`, { headers: authHeaders });
-        if (res.status === 401 || res.status === 403) {
+        const result = await safeFetchJson<any>(`/api/business/${business.id}`, { headers: authHeaders });
+        if (!result.success) throw new Error(result.parseError || 'Failed to load store');
+        const { response, data } = result;
+        if (response.status === 401 || response.status === 403) {
           localStorage.removeItem('vendorToken');
           localStorage.removeItem('vendorSession');
           window.location.href = '/business/login';
           return;
         }
-        const data = await res.json();
         if (data.success && data.registration) {
           setStoreData(data.registration);
           setDraft({});
@@ -131,30 +133,36 @@ export const EditStore = () => {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const res = await fetch(`/api/business/${business.id}/images`, {
+      // Multipart upload: fall back to raw fetch + res.text guard (safeFetchJson doesn't cover multipart well)
+      const uploadRes = await fetch(`/api/business/${business.id}/images`, {
         method: 'POST',
         headers: authHeaders,
         body: formData,
       });
-      const data = await res.json();
-      if (data.success && data.url) {
-        const updates = { [field]: data.url };
-        const putRes = await fetch(`/api/business/${business.id}`, {
+      const uploadRaw = await uploadRes.text();
+      let uploadData: any;
+      try { uploadData = JSON.parse(uploadRaw); } catch {
+        throw new Error(`Image upload failed (server returned non-JSON). Preview: ${uploadRaw.slice(0, 200)}`);
+      }
+      if (uploadData.success && uploadData.url) {
+        const updates = { [field]: uploadData.url };
+        const putResult = await safeFetchJson<any>(`/api/business/${business.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify(updates),
         });
-        const putData = await putRes.json();
+        if (!putResult.success) throw new Error(putResult.parseError || 'Failed to update store after image upload');
+        const putData = putResult.data;
         if (putData.success && putData.registration) {
           setStoreData(putData.registration);
           setSaveSuccess(true);
           setTimeout(() => setSaveSuccess(false), 3000);
         }
       } else {
-        setSaveError(data.error || 'Image upload failed');
+        setSaveError(uploadData.error || 'Image upload failed');
       }
-    } catch (e) {
-      setSaveError('Image upload failed');
+    } catch (e: any) {
+      setSaveError(e?.message || 'Image upload failed');
     } finally {
       setSaving(false);
     }
@@ -165,12 +173,13 @@ export const EditStore = () => {
     setSaving(true);
     setSaveError('');
     try {
-      const res = await fetch(`/api/business/${business.id}`, {
+      const result = await safeFetchJson<any>(`/api/business/${business.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify(draft),
       });
-      const data = await res.json();
+      if (!result.success) throw new Error(result.parseError || 'Failed to save changes');
+      const { data } = result;
       if (data.success && data.registration) {
         setStoreData(data.registration);
         setDraft({});
@@ -180,8 +189,8 @@ export const EditStore = () => {
       } else {
         setSaveError(data.error || 'Save failed');
       }
-    } catch (e) {
-      setSaveError('Failed to save changes');
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to save changes');
     } finally {
       setSaving(false);
     }
@@ -195,12 +204,17 @@ export const EditStore = () => {
       setSaving(true);
       setSaveError('');
       try {
-        const res = await fetch(`/api/business/${business.id}`, {
+        const result = await safeFetchJson<any>(`/api/business/${business.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify(draft),
         });
-        const data = await res.json();
+        if (!result.success) {
+          setSaveError(result.parseError || 'Failed to save changes before submitting');
+          setSaving(false);
+          return;
+        }
+        const { data } = result;
         if (data.success && data.registration) {
           setStoreData(data.registration);
           setDraft({});
@@ -210,8 +224,8 @@ export const EditStore = () => {
           setSaving(false);
           return;
         }
-      } catch (e) {
-        setSaveError('Failed to save changes before submitting');
+      } catch (e: any) {
+        setSaveError(e?.message || 'Failed to save changes before submitting');
         setSaving(false);
         return;
       } finally {

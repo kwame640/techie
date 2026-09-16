@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail } from 'lucide-react';
 import logoImage from '../../images/nkay.png';
+import { safeFetchJson } from '../../lib/fetch';
 
 export const AdminLogin = () => {
   const [email, setEmail] = useState('');
@@ -16,14 +17,14 @@ export const AdminLogin = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/admin/login', {
+      const result = await safeFetchJson<any>('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+      if (!result.success) throw new Error(result.parseError || 'Login failed');
 
-      const data = await response.json();
-
+      const { data } = result;
       if (data.success) {
         localStorage.setItem('adminToken', data.token);
         localStorage.setItem('adminEmail', data.admin.email);
@@ -32,7 +33,7 @@ export const AdminLogin = () => {
         setError(data.error || 'Login failed');
       }
     } catch (err) {
-      setError('Connection failed. Is the server running?');
+      setError((err as any)?.message || 'Connection failed. Is the server running?');
     } finally {
       setIsLoading(false);
     }
