@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Store,
   Phone,
@@ -74,6 +75,7 @@ const BUSINESS_TYPES = [
 
 export const EditStore = () => {
   const { business } = useAuth();
+  const navigate = useNavigate();
   const vendorToken = business?.vendorToken || localStorage.getItem('vendorToken') || '';
   const authHeaders: HeadersInit = vendorToken ? { Authorization: `Bearer ${vendorToken}` } : {};
 
@@ -183,6 +185,64 @@ export const EditStore = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSubmitStore = async () => {
+    if (!business?.id || !storeData) return;
+
+    // Flush any pending edits first so latest changes are saved before completion check
+    if (Object.keys(draft).length > 0) {
+      setSaving(true);
+      setSaveError('');
+      try {
+        const res = await fetch(`/api/business/${business.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
+          body: JSON.stringify(draft),
+        });
+        const data = await res.json();
+        if (data.success && data.registration) {
+          setStoreData(data.registration);
+          setDraft({});
+          setExpandedSection(null);
+        } else {
+          setSaveError(data.error || 'Failed to save changes before submitting');
+          setSaving(false);
+          return;
+        }
+      } catch (e) {
+        setSaveError('Failed to save changes before submitting');
+        setSaving(false);
+        return;
+      } finally {
+        setSaving(false);
+      }
+    }
+
+    // Re-check completion from the latest (refreshed) storeData
+    const checks = [
+      { label: 'Store name', done: Boolean(storeData.businessName?.trim()) },
+      { label: 'Category', done: Boolean(storeData.businessCategory?.trim()) },
+      { label: 'Phone number', done: Boolean(storeData.phone?.trim()) },
+      { label: 'Email address', done: Boolean(storeData.email?.trim()) },
+      { label: 'Location (city)', done: Boolean(storeData.city?.trim()) },
+      { label: 'Description', done: Boolean(storeData.description?.trim()) },
+      { label: 'Store logo', done: Boolean(storeData.storeLogo?.trim()) },
+      { label: 'Store banner', done: Boolean(storeData.storeBanner?.trim()) },
+    ];
+    const missing = checks.filter((c) => !c.done).map((c) => c.label);
+    if (missing.length > 0) {
+      setSaveError(
+        `Please complete your store profile first. Missing: ${missing.join(', ')}.`
+      );
+      return;
+    }
+
+    setSaveSuccess(true);
+    setTimeout(() => {
+      setSaveSuccess(false);
+      navigate(`/store/${business.id}`);
+    }, 900);
   };
 
   const handleCancel = () => {
@@ -663,6 +723,91 @@ export const EditStore = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Submit / Publish Store */}
+      <div className="mb-6 bg-gradient-to-br from-primary/5 via-accent-beige/60 to-primary/5 border border-primary/15 rounded-2xl shadow-[0_4px_18px_rgba(74,43,28,0.04)] p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center flex-shrink-0">
+                <Check className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-text leading-tight">Submit &amp; View Your Store</h2>
+                <p className="text-xs sm:text-sm text-text-light mt-0.5">
+                  Finish your profile and publish it live on the NKAY marketplace — customers will be able to find your business at <span className="font-mono font-semibold text-primary">/store/{business?.id || 'your-business'}</span>
+                </p>
+              </div>
+            </div>
+            {/* Live completion summary inline */}
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1.5 text-xs sm:text-sm">
+                <span className="font-medium text-text">Profile completion</span>
+                <span className={`font-bold ${completion === 100 ? 'text-green-700' : 'text-primary'}`}>
+                  {completion}%
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-white rounded-full overflow-hidden border border-[#eee5df]">
+                <div
+                  className={`h-full transition-all duration-400 ${completion === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                  style={{ width: `${completion}%` }}
+                />
+              </div>
+              {completion < 100 && (
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] sm:text-xs">
+                  {completionItems.map((item) => (
+                    <div
+                      key={item.label}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border ${
+                        item.done
+                          ? 'border-green-200 bg-green-50 text-green-800'
+                          : 'border-[#f1ebe7] bg-white text-[#927f74]'
+                      }`}
+                    >
+                      {item.done ? (
+                        <Check className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                      ) : (
+                        <div className="w-3.5 h-3.5 rounded-full border border-[#dfe8e1] text-[10px] flex items-center justify-center text-[#927f74] flex-shrink-0">
+                          !
+                        </div>
+                      )}
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {completion === 100 && (
+                <p className="text-xs sm:text-sm text-green-700 mt-2 flex items-center gap-1.5">
+                  <Check className="w-4 h-4" />
+                  Your store profile is complete — you're ready to publish.
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex-shrink-0 w-full sm:w-auto flex gap-3 sm:flex-col sm:items-stretch">
+            <button
+              onClick={handleSubmitStore}
+              disabled={saving}
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 sm:px-6 py-3 bg-primary text-white rounded-2xl text-sm sm:text-base font-bold hover:bg-primary/90 transition disabled:opacity-60 shadow-lg shadow-primary/20"
+            >
+              {saving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  Saving changes…
+                </>
+              ) : (
+                <>
+                  <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Submit &amp; View My Store
+                </>
+              )}
+            </button>
+            <p className="text-[11px] text-[#927f74] text-center sm:text-right leading-tight">
+              Saves pending edits, then redirects<br className="hidden sm:inline" /> to your live store page.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Already saved notice */}
