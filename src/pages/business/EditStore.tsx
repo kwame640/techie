@@ -10,7 +10,6 @@ import {
   Clock,
   Save,
   X,
-  Edit,
   Check,
   Upload,
   ChevronDown,

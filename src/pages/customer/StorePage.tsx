@@ -42,6 +42,7 @@ const storeNav = [
 
 export const StorePage = () => {
   const { storeId } = useParams<{ storeId: string }>();
+  const navigate = useNavigate();
   const { addToCart } = useShop();
   const [business, setBusiness] = useState<Business | null>(null);
   const [searched, setSearched] = useState(false);
@@ -69,15 +70,41 @@ export const StorePage = () => {
               description: reg.description || '',
               logo: reg.storeLogo || '/api/placeholder/100/100',
               coverImage: reg.storeBanner || '/api/placeholder/1200/400',
-              category: reg.businessCategory || '',
+              category: (reg.businessCategory || 'Other') as Business['category'],
               city: reg.city || '',
               region: reg.region || '',
+              area: reg.address || reg.city || '',
+              pickupLocation: reg.address || reg.city || '',
               phone: reg.phone || '',
               email: reg.email || '',
+              openingHours: reg.businessHours || {
+                Mon: { open: '08:00', close: '18:00' },
+                Tue: { open: '08:00', close: '18:00' },
+                Wed: { open: '08:00', close: '18:00' },
+                Thu: { open: '08:00', close: '18:00' },
+                Fri: { open: '08:00', close: '18:00' },
+                Sat: { open: '09:00', close: '17:00', closed: false },
+                Sun: { open: '12:00', close: '17:00', closed: true },
+              },
+              verificationStatus:
+                (reg.status === 'live' || reg.verificationStatus === 'approved')
+                  ? 'approved'
+                  : ((reg.verificationStatus as any) || 'pending'),
+              storeUrl: reg.storeUrl || '',
               rating: reg.rating || 4.5,
               reviewCount: reg.reviewCount || 0,
+              followerCount: reg.followerCount || 0,
               productCount: reg.productCount || 0,
-              status: 'live' as const,
+              orderCount: reg.orderCount || 0,
+              status:
+                (reg.status === 'live' || reg.status === 'pending' || reg.status === 'suspended')
+                  ? (reg.status as Business['status'])
+                  : 'live',
+              deliveryOptions: ['customer_pickup'],
+              paymentMethods: [
+                { type: 'mobile_money', accountNumber: '', accountName: '' },
+              ],
+              createdAt: reg.registrationDate ? new Date(reg.registrationDate) : new Date(),
               socialLinks: reg.socialLinks || {},
             };
             setBusiness(mapped);
