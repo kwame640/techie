@@ -2,13 +2,6 @@
   "buildCommand": "npm install && npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "functions": {
-    "api/[...catchall].js": {
-      "runtime": "@vercel/node@4",
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/[...catchall]" },
     { "source": "/uploads/:path*", "destination": "/api/[...catchall]" },
