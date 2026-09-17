@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Search, Truck, Store, X as XIcon,
   ArrowRight, Heart, Home, Grid3x3, Building2,
-  ShoppingCart, Package, ShoppingBag, User as UserIcon, Menu, MessageCircle,
+  ShoppingCart, Package, ShoppingBag, Menu, MessageCircle,
   CreditCard, Facebook, Instagram, Twitter, Linkedin, Globe,
 } from 'lucide-react';
 import { sampleBusinesses, businessCategories, sampleProducts } from '../../data/marketplaceData';
@@ -18,7 +18,6 @@ const sidebarNav = [
   { name: 'Categories', href: '/discover', icon: Grid3x3 },
   { name: 'Businesses', href: '/discover', icon: Building2 },
   { name: 'Orders', href: '/customer/orders', icon: Package },
-  { name: 'Profile', href: '/customer/profile', icon: UserIcon },
 ];
 
 const categoryIcons: Record<string, JSX.Element> = {
@@ -267,9 +266,9 @@ export const MarketplaceHome = () => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-            <Link to="#contact" className="hidden sm:inline-flex items-center gap-2 bg-primary text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium hover:bg-primary/90 transition whitespace-nowrap">
-              <MessageCircle className="w-4 h-4" />
-              Contact Us
+            <Link to="/business/register" className="hidden sm:inline-flex items-center gap-2 bg-primary text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium hover:bg-primary/90 transition whitespace-nowrap">
+              <Store className="w-4 h-4" />
+              Register Your Business
             </Link>
             <button onClick={() => setMobileNavOpen(true)} className="lg:hidden p-2 rounded-xl hover:bg-accent-beige transition-colors" aria-label="Open navigation and categories">
               <Menu className="w-5 h-5 text-text-light" />

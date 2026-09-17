@@ -300,6 +300,17 @@ app.use((error, req, res, _next) => {
   res.status(statusCode).json({ success: false, error: error.message || 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Export the fully-configured Express app for use by Vercel serverless functions (api/index.js)
+// as well as any other consumers. The file also doubles as a standalone entry point when
+// run directly via `node server/index.js` for local development (`npm run server`).
+export { app };
+
+// Vercel serverless functions provide their own HTTP server at runtime, so we must NOT call
+// `app.listen()` inside a serverless context (it would fail to bind a port). Start the local
+// server only when this file is directly invoked as the process entry point.
+const isDirectEntry = process.argv[1] && (process.argv[1] === fileURLToPath(import.meta.url) || process.argv[1].endsWith('server/index.js'));
+if (isDirectEntry) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}

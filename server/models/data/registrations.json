@@ -1,5 +1,22 @@
 [
   {
+    "id": "reg_1789597413502_91ox9vg",
+    "businessName": "Listeve Laundry Services",
+    "businessType": "other",
+    "businessCategory": "services",
+    "email": "godfreda938@gmail.com",
+    "phone": "0987654321",
+    "address": "Yiadom-Hwedie Street",
+    "city": "Koforidua",
+    "region": "",
+    "country": "Ghana",
+    "preferredContactMethod": "email",
+    "description": "We do laundrying",
+    "status": "Approved",
+    "registrationDate": "2026-09-16T22:23:33.502Z",
+    "updatedAt": "2026-09-16T22:23:52.577Z"
+  },
+  {
     "id": "reg_1789294355859_utsgjoj",
     "businessName": "Kofi Electronics",
     "businessType": "retail",
@@ -118,17 +135,17 @@
   {
     "id": "vendor-glorriet-beauty-bloom",
     "businessName": "Glorriet Beauty Bloom",
-    "businessType": "",
-    "businessCategory": "",
+    "businessType": "retail",
+    "businessCategory": "fashion",
     "email": "glorriet@nkay.com",
-    "phone": "",
-    "whatsappNumber": "",
-    "address": "",
-    "city": "",
-    "region": "",
-    "country": "",
-    "preferredContactMethod": "",
-    "description": "",
+    "phone": "0989898989",
+    "whatsappNumber": "0000000000",
+    "address": "Yiadom-Hwedie Street",
+    "city": "Koforidua",
+    "region": "Accra",
+    "country": "Ghana",
+    "preferredContactMethod": "whatsapp",
+    "description": "mjhnb hjg",
     "storeLogo": "/uploads/business-images/business_1789208852714_1rgst15.webp",
     "storeBanner": "/uploads/business-images/business_1789208860789_jth41in.webp",
     "businessHours": {
@@ -172,7 +189,7 @@
     "storeStatus": "live",
     "status": "Approved",
     "registrationDate": "2026-09-12T10:27:43.163Z",
-    "updatedAt": "2026-09-12T10:27:43.163Z"
+    "updatedAt": "2026-09-16T22:02:07.189Z"
   },
   {
     "id": "reg_1788679711783_tss91pz",

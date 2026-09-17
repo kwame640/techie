@@ -74,6 +74,20 @@ const BUSINESS_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
+const CONTACT_OPTIONS = [
+  { value: 'email', label: 'Email' },
+  { value: 'phone', label: 'Phone' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+];
+
+const COUNTRY_OPTIONS = [
+  { value: 'Ghana', label: 'Ghana' },
+  { value: 'Nigeria', label: 'Nigeria' },
+  { value: 'Kenya', label: 'Kenya' },
+  { value: 'South Africa', label: 'South Africa' },
+  { value: 'Other', label: 'Other' },
+];
+
 export const EditStore = () => {
   const { business } = useAuth();
   const navigate = useNavigate();
@@ -299,6 +313,12 @@ export const EditStore = () => {
 
   const completion = calculateCompletion();
 
+  const locationValue = [
+    storeData?.city?.trim(),
+    storeData?.region?.trim(),
+    storeData?.country?.trim(),
+  ].filter(Boolean).join(' • ') || 'Not set';
+
   // ---- Reusable display component ----
   type DisplayFieldProps = {
     label: string;
@@ -352,6 +372,24 @@ export const EditStore = () => {
     );
   };
 
+  const saveCancelButtons = (
+    <div className="flex gap-3 pt-2">
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition disabled:opacity-60"
+      >
+        {saving ? 'Saving...' : <><Save className="w-4 h-4" /> Save changes</>}
+      </button>
+      <button
+        onClick={handleCancel}
+        className="px-4 py-2 border border-[#dfe8e1] text-[#6f5c50] rounded-lg text-sm font-medium hover:bg-[#f7f1ed] transition"
+      >
+        Cancel
+      </button>
+    </div>
+  );
+
   if (loading) {
     return (
       <VendorLayout title="Edit Store">
@@ -370,33 +408,8 @@ export const EditStore = () => {
       <PageHeading
         eyebrow="Store settings"
         title="Edit Store"
-        description="Update your store profile. Changes are saved immediately."
+        description="Update your store profile. Open a section to edit it — changes save instantly."
       />
-
-      {/* Completion indicator */}
-      <div className="mb-8 bg-white border border-[#eee5df] rounded-2xl p-6 shadow-[0_4px_18px_rgba(74,43,28,0.04)]">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-text">Store profile completion</h2>
-          <span className="text-sm font-semibold text-primary">{completion}% complete</span>
-        </div>
-        <div className="w-full h-3 bg-[#eee5df] rounded-full overflow-hidden mb-4">
-          <div className="h-full bg-primary transition-all duration-300" style={{ width: `${completion}%` }} />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {completionItems.map((item) => (
-            <div key={item.label} className="flex items-center gap-2">
-              {item.done ? (
-                <Check className="w-4 h-4 text-green-600" />
-              ) : (
-                <div className="w-4 h-4 rounded-full border border-[#dfe8e1] text-xs flex items-center justify-center text-[#927f74]" />
-              )}
-              <span className={`text-xs ${item.done ? 'text-text' : 'text-[#927f74]'}`}>
-                {item.label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Save success/error banner */}
       {saveSuccess && (
@@ -432,7 +445,9 @@ export const EditStore = () => {
         <DisplayField label="Store name" value={getField('businessName')} icon={Store} />
         <DisplayField label="Category" value={getField('businessCategory', 'Not set')} icon={Tag} />
         <DisplayField label="Business type" value={getField('businessType', 'Not set')} icon={Building} />
-        <DisplayField label="Short description" value={getField('description', 'No description added')} icon={Store} />
+        <DisplayField label="Description" value={getField('description', 'No description added')} icon={Store} />
+        <DisplayField label="Store status" value={storeData.status === 'live' ? 'Live' : 'Pending'} icon={Check} />
+        <DisplayField label="Registration date" value={storeData.registrationDate ? new Date(storeData.registrationDate).toLocaleDateString('en-GH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Not set'} icon={Clock} />
 
         {expandedSection === 'profile' && (
           <div className="border-t border-[#f1ebe7] p-6 space-y-4">
@@ -449,29 +464,15 @@ export const EditStore = () => {
               {compactInput('businessType', 'select', { options: BUSINESS_TYPES, placeholder: 'Select business type' })}
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Short description</label>
+              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Description</label>
               {compactInput('description', 'textarea', { placeholder: 'Tell customers about your store...' })}
             </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : <><Save className="w-4 h-4" /> Save changes</>}
-              </button>
-              <button
-                onClick={handleCancel}
-                className="px-4 py-2 border border-[#dfe8e1] text-[#6f5c50] rounded-lg text-sm font-medium hover:bg-[#f7f1ed] transition"
-              >
-                Cancel
-              </button>
-            </div>
+            {saveCancelButtons}
           </div>
         )}
       </div>
 
-      {/* Contact Section */}
+      {/* Contact & Location Section */}
       <div className="mb-6 bg-white border border-[#eee5df] rounded-2xl shadow-[0_4px_18px_rgba(74,43,28,0.04)] overflow-hidden">
         <div
           className="p-6 cursor-pointer hover:bg-[#faf8f6] transition"
@@ -482,7 +483,7 @@ export const EditStore = () => {
               <div className="w-8 h-8 rounded-lg bg-[#e6f5ed] text-[#16734b] flex items-center justify-center">
                 <Phone className="w-4 h-4" />
               </div>
-              <h3 className="font-semibold text-text">Contact</h3>
+              <h3 className="font-semibold text-text">Contact &amp; Location</h3>
             </div>
             {expandedSection === 'contact' ? <ChevronUp className="w-5 h-5 text-[#927f74]" /> : <ChevronDown className="w-5 h-5 text-[#927f74]" />}
           </div>
@@ -491,8 +492,9 @@ export const EditStore = () => {
         <DisplayField label="Phone" value={getField('phone', 'Not set')} icon={Phone} />
         <DisplayField label="Email" value={getField('email', 'Not set')} icon={Mail} />
         <DisplayField label="WhatsApp" value={getField('whatsappNumber', 'Not set')} icon={Phone} />
-        <DisplayField label="Location" value={`${getField('city', 'No city')} • ${getField('region', 'No region')}`} icon={MapPin} />
         <DisplayField label="Preferred contact" value={getField('preferredContactMethod', 'Not set')} icon={Mail} />
+        <DisplayField label="Location" value={locationValue} icon={MapPin} />
+        <DisplayField label="Address" value={getField('address', 'Not set')} icon={MapPin} />
 
         {expandedSection === 'contact' && (
           <div className="border-t border-[#f1ebe7] p-6 space-y-4">
@@ -509,6 +511,10 @@ export const EditStore = () => {
               {compactInput('whatsappNumber', 'input', { placeholder: '+233 50 123 4567' })}
             </div>
             <div>
+              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Preferred contact method</label>
+              {compactInput('preferredContactMethod', 'select', { options: CONTACT_OPTIONS, placeholder: 'Select contact method' })}
+            </div>
+            <div>
               <label className="block text-xs font-medium text-[#9a7968] mb-1.5">City</label>
               {compactInput('city', 'input', { placeholder: 'Accra, Kumasi...' })}
             </div>
@@ -517,36 +523,19 @@ export const EditStore = () => {
               {compactInput('region', 'input', { placeholder: 'Greater Accra, Ashanti...' })}
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Preferred contact method</label>
-              {compactInput('preferredContactMethod', 'select', {
-                options: [
-                  { value: 'email', label: 'Email' },
-                  { value: 'phone', label: 'Phone' },
-                  { value: 'whatsapp', label: 'WhatsApp' },
-                ],
-                placeholder: 'Select contact method',
-              })}
+              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Address</label>
+              {compactInput('address', 'input', { placeholder: 'Street address' })}
             </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : <><Save className="w-4 h-4" /> Save changes</>}
-              </button>
-              <button
-                onClick={handleCancel}
-                className="px-4 py-2 border border-[#dfe8e1] text-[#6f5c50] rounded-lg text-sm font-medium hover:bg-[#f7f1ed] transition"
-              >
-                Cancel
-              </button>
+            <div>
+              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Country</label>
+              {compactInput('country', 'select', { options: COUNTRY_OPTIONS, placeholder: 'Select country' })}
             </div>
+            {saveCancelButtons}
           </div>
         )}
       </div>
 
-      {/* Store Appearance Section */}
+      {/* Appearance & Links Section */}
       <div className="mb-6 bg-white border border-[#eee5df] rounded-2xl shadow-[0_4px_18px_rgba(74,43,28,0.04)] overflow-hidden">
         <div
           className="p-6 cursor-pointer hover:bg-[#faf8f6] transition"
@@ -557,13 +546,13 @@ export const EditStore = () => {
               <div className="w-8 h-8 rounded-lg bg-[#e6f5ed] text-[#16734b] flex items-center justify-center">
                 <Upload className="w-4 h-4" />
               </div>
-              <h3 className="font-semibold text-text">Store Appearance</h3>
+              <h3 className="font-semibold text-text">Appearance &amp; Links</h3>
             </div>
             {expandedSection === 'appearance' ? <ChevronUp className="w-5 h-5 text-[#927f74]" /> : <ChevronDown className="w-5 h-5 text-[#927f74]" />}
           </div>
         </div>
 
-        <div className="p-6 border-t border-[#f1ebe7]">
+        <div className="p-6 border-t border-[#f1ebe7] flex items-center gap-4">
           {storeData.storeLogo ? (
             <img src={storeData.storeLogo} alt="Store logo" className="w-20 h-20 rounded-xl object-cover border border-[#eee5df]" />
           ) : (
@@ -571,7 +560,10 @@ export const EditStore = () => {
               <Store className="w-8 h-8 text-[#c5b4a7]" />
             </div>
           )}
-          <p className="text-xs text-[#9a7968] mt-2">Store logo</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-[#9a7968]">Store logo</p>
+            {storeData.storeLogo && <p className="text-xs text-[#16734b] mt-0.5">Set</p>}
+          </div>
         </div>
 
         <div className="p-6 border-t border-[#f1ebe7]">
@@ -607,134 +599,7 @@ export const EditStore = () => {
               />
               {storeData.storeBanner && <p className="text-xs text-[#9a7968] mt-1">Current banner is set</p>}
             </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleCancel}
-                className="px-4 py-2 border border-[#dfe8e1] text-[#6f5c50] rounded-lg text-sm font-medium hover:bg-[#f7f1ed] transition"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* About Your Store Section */}
-      <div className="mb-6 bg-white border border-[#eee5df] rounded-2xl shadow-[0_4px_18px_rgba(74,43,28,0.04)] overflow-hidden">
-        <div
-          className="p-6 cursor-pointer hover:bg-[#faf8f6] transition"
-          onClick={() => handleEdit('about')}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#e6f5ed] text-[#16734b] flex items-center justify-center">
-                <Globe className="w-4 h-4" />
-              </div>
-              <h3 className="font-semibold text-text">About Your Store</h3>
-            </div>
-            {expandedSection === 'about' ? <ChevronUp className="w-5 h-5 text-[#927f74]" /> : <ChevronDown className="w-5 h-5 text-[#927f74]" />}
-          </div>
-        </div>
-
-        <DisplayField label="Description" value={getField('description', 'No description added')} icon={Store} />
-        <DisplayField label="Business hours" value="Set in business hours section" icon={Clock} />
-        <DisplayField label="Store URL" value={getField('storeUrl', 'Not set')} icon={Globe} />
-        <DisplayField label="Social links" value={getField('socialLinks', 'None set')} icon={Globe} />
-
-        {expandedSection === 'about' && (
-          <div className="border-t border-[#f1ebe7] p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Full description</label>
-              {compactInput('description', 'textarea', { placeholder: 'Tell customers more about your store...' })}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Store URL</label>
-              {compactInput('storeUrl', 'input', { placeholder: 'your-store.nkay.com' })}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Facebook URL</label>
-              {compactInput('socialLinks.facebook', 'input', { placeholder: 'facebook.com/yourstore' })}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Instagram URL</label>
-              {compactInput('socialLinks.instagram', 'input', { placeholder: 'instagram.com/yourstore' })}
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : <><Save className="w-4 h-4" /> Save changes</>}
-              </button>
-              <button
-                onClick={handleCancel}
-                className="px-4 py-2 border border-[#dfe8e1] text-[#6f5c50] rounded-lg text-sm font-medium hover:bg-[#f7f1ed] transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Business Details Section */}
-      <div className="mb-6 bg-white border border-[#eee5df] rounded-2xl shadow-[0_4px_18px_rgba(74,43,28,0.04)] overflow-hidden">
-        <div
-          className="p-6 cursor-pointer hover:bg-[#faf8f6] transition"
-          onClick={() => handleEdit('details')}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#e6f5ed] text-[#16734b] flex items-center justify-center">
-                <Building className="w-4 h-4" />
-              </div>
-              <h3 className="font-semibold text-text">Business Details</h3>
-            </div>
-            {expandedSection === 'details' ? <ChevronUp className="w-5 h-5 text-[#927f74]" /> : <ChevronDown className="w-5 h-5 text-[#927f74]" />}
-          </div>
-        </div>
-
-        <DisplayField label="Business type" value={getField('businessType', 'Not set')} icon={Building} />
-        <DisplayField label="Address" value={getField('address', 'Not set')} icon={MapPin} />
-        <DisplayField label="Country" value={getField('country', 'Not set')} icon={Globe} />
-        <DisplayField label="Store status" value={storeData.status === 'live' ? 'Live' : 'Pending'} icon={Check} />
-        <DisplayField label="Registration date" value={storeData.registrationDate ? new Date(storeData.registrationDate).toLocaleDateString('en-GH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Not set'} icon={Clock} />
-
-        {expandedSection === 'details' && (
-          <div className="border-t border-[#f1ebe7] p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Address</label>
-              {compactInput('address', 'input', { placeholder: 'Street address' })}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#9a7968] mb-1.5">Country</label>
-              {compactInput('country', 'select', {
-                options: [
-                  { value: 'Ghana', label: 'Ghana' },
-                  { value: 'Nigeria', label: 'Nigeria' },
-                  { value: 'Kenya', label: 'Kenya' },
-                  { value: 'South Africa', label: 'South Africa' },
-                  { value: 'Other', label: 'Other' },
-                ],
-                placeholder: 'Select country',
-              })}
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : <><Save className="w-4 h-4" /> Save changes</>}
-              </button>
-              <button
-                onClick={handleCancel}
-                className="px-4 py-2 border border-[#dfe8e1] text-[#6f5c50] rounded-lg text-sm font-medium hover:bg-[#f7f1ed] transition"
-              >
-                Cancel
-              </button>
-            </div>
+            {saveCancelButtons}
           </div>
         )}
       </div>
