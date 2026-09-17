@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Search, Truck, Store, X as XIcon,
   ArrowRight, Heart, Home, Grid3x3, Building2,
-  ShoppingCart, Package, ShoppingBag, Menu, MessageCircle,
+  ShoppingCart, Package, ShoppingBag, Menu,
   CreditCard, Facebook, Instagram, Twitter, Linkedin, Globe,
 } from 'lucide-react';
 import { sampleBusinesses, businessCategories, sampleProducts } from '../../data/marketplaceData';
@@ -42,7 +42,7 @@ const footerLinks = {
   ],
   customerService: [
     { name: 'Help Center', href: '#' },
-    { name: 'Contact Us', href: '#' },
+    { name: 'Register Your Business', href: '/business/register' },
     { name: 'Shipping Info', href: '#' },
     { name: 'Returns', href: '#' },
     { name: 'Track Order', href: '/login' },
@@ -368,12 +368,12 @@ export const MarketplaceHome = () => {
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[#927f74] mb-3 px-2">Help</h3>
                 <Link
-                  to="#contact"
+                  to="/business/register"
                   onClick={() => setMobileNavOpen(false)}
                   className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium bg-primary/5 text-primary hover:bg-primary/10 transition-colors border border-primary/10"
                 >
-                  <MessageCircle className="w-5 h-5" />
-                  Contact Us
+                  <Store className="w-5 h-5" />
+                  Register Your Business
                 </Link>
               </div>
             </div>
