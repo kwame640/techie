@@ -28,6 +28,11 @@ export const homepageBanners: HomepageBanner[] = [
     title: "Knorr Collection",
     link: "/discover",
   },
+  {
+    image: "/images/listeve.png",
+    title: "Listeve Laundry Services",
+    link: "/discover",
+  },
 ];
 
 interface HomepageCarouselProps {

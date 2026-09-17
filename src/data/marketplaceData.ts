@@ -1,5 +1,4 @@
-﻿import listevePng from '../images/listeve.png';
-import { Business, Product, Order, Review, Promotion, Notification } from '../types/marketplace';
+﻿import { Business, Product, Order, Review, Promotion, Notification } from '../types/marketplace';
 
 export const sampleBusinesses: Business[] = [
   {
@@ -256,25 +255,6 @@ export const sampleBusinesses: Business[] = [
 ];
 
 export const sampleProducts: Product[] = [
-  {
-    id: 'listeve-prod-1',
-    businessId: 'biz-1',
-    name: 'Listeve Signature Collection',
-    description: 'Handcrafted premium collection — a NKAY featured business. Modern African design, quality craftsmanship.',
-    category: 'Fashion',
-    price: 850,
-    discountPrice: 699,
-    images: [listevePng],
-    stock: 25,
-    sku: 'LV-SIG-01',
-    weight: 0.6,
-    status: 'active',
-    rating: 4.9,
-    reviewCount: 128,
-    salesCount: 210,
-    createdAt: new Date('2025-01-04'),
-    updatedAt: new Date('2025-02-10'),
-  },
   {
     id: 'prod-1',
     businessId: 'biz-1',
