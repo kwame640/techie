@@ -408,7 +408,7 @@ export const StorePage = () => {
               </div>
             ) : (
               <div className={viewMode === 'grid'
-                ? "grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                ? "grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
                 : "space-y-4"
               }>
                 {filtered.map((product) => {
@@ -421,7 +421,7 @@ export const StorePage = () => {
                     <div
                       key={product.id}
                       className={`bg-white rounded-xl shadow-card hover:shadow-soft transition-all duration-300 group ${
-                        viewMode === 'list' ? 'flex gap-4 p-4' : 'p-4'
+                        viewMode === 'list' ? 'flex gap-4 p-4' : 'p-3 sm:p-4'
                       }`}
                     >
                       <Link to={`/product/${product.id}`} className={`block ${viewMode === 'list' ? 'w-24 h-24 flex-shrink-0' : 'block'}`}>
