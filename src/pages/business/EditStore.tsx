@@ -337,7 +337,7 @@ export const EditStore = () => {
 
   // ---- Editable input component for compact inline editing ----
   const compactInput = (key: string, type: 'input' | 'textarea' | 'select' = 'input', opts?: { options?: { value: string; label: string }[]; placeholder?: string }) => {
-    const value = draft.hasOwnProperty(key) ? draft[key] : (storeData?.[key as keyof BusinessData] ?? '');
+    const value = draft.hasOwnProperty(key) ? draft[key] : '';
     if (type === 'select' && opts?.options) {
       return (
         <select
