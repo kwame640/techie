@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Search, Truck, Store, X as XIcon,
   ArrowRight, Heart, Home, Grid3x3, Building2,
@@ -83,9 +83,11 @@ function shuffle<T>(arr: T[], seed = 1): T[] {
 }
 
 export const MarketplaceHome = () => {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [apiBusinesses, setApiBusinesses] = useState<any[]>([]);
   const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
+  const [headerSearch, setHeaderSearch] = useState('');
 
   useEffect(() => {
     const fetchBusinesses = async () => {
@@ -153,6 +155,7 @@ export const MarketplaceHome = () => {
           storeName: biz?.name,
           location: biz ? `${biz.city || ''}, ${biz.region || ''}`.trim() : undefined,
           businessId: p.businessId,
+          verified: biz ? biz.status === 'live' || biz.verificationStatus === 'approved' : false,
           isNew: (p.createdAt && new Date(p.createdAt).getTime() > Date.now() - 1000 * 60 * 60 * 24 * 30) ? true : false,
         };
       }),
@@ -255,14 +258,24 @@ export const MarketplaceHome = () => {
           </Link>
 
           <div className="flex-1 max-w-2xl mx-2 sm:mx-4 lg:mx-8">
-            <div className="relative">
+            <form
+              className="relative"
+              role="search"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = headerSearch.trim();
+                if (q) navigate(`/search?q=${encodeURIComponent(q)}`);
+              }}
+            >
               <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-text-light" />
               <input
                 type="text"
+                value={headerSearch}
+                onChange={(e) => setHeaderSearch(e.target.value)}
                 placeholder="Search products, stores or categories..."
                 className="w-full pl-9 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-xs sm:text-sm"
               />
-            </div>
+            </form>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">

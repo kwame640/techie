@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Star, MapPin, Store } from 'lucide-react';
+import { BadgeCheck, Heart, Star, MapPin, Store } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 import { formatGhc, calculateDiscount } from '../lib/utils';
 
@@ -17,6 +17,7 @@ export interface CompactProduct {
   storeName?: string;
   location?: string;
   businessId?: string;
+  verified?: boolean;
   isNew?: boolean;
   isBestSeller?: boolean;
 }
@@ -87,16 +88,15 @@ export const CompactProductCard: React.FC<CompactProductCardProps> = ({ product,
     addToCart(shopProduct as any);
   };
 
-  const productLink = product.businessId
-    ? `/store/${product.businessId}`
-    : `/product/${product.id}`;
+  const productHref = `/product/${product.id}`;
+  const storeHref = product.businessId ? `/store/${product.businessId}` : null;
 
   return (
-    <Link
-      to={productLink}
+    <div
       className="group block bg-white rounded-xl border border-gray-100 shadow-card hover:shadow-card-hover hover:border-accent-tan/60 transition-all duration-300 overflow-hidden h-full flex flex-col"
     >
       <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-accent-beige/60 to-background overflow-hidden">
+        <Link to={productHref} aria-label={product.name} className="block w-full h-full">
         {!imageError ? (
           <img
             src={product.image}
@@ -115,6 +115,7 @@ export const CompactProductCard: React.FC<CompactProductCardProps> = ({ product,
             </span>
           </div>
         )}
+        </Link>
 
         <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 flex flex-col gap-1">
           {onSale && (
@@ -163,18 +164,31 @@ export const CompactProductCard: React.FC<CompactProductCardProps> = ({ product,
           </span>
         )}
 
-        <h3 className="text-[13px] sm:text-sm font-semibold text-text leading-snug line-clamp-2 min-h-[36px] sm:min-h-[40px]">
+        <Link
+          to={productHref}
+          className="text-[13px] sm:text-sm font-semibold text-text leading-snug line-clamp-2 min-h-[36px] sm:min-h-[40px]"
+        >
           {product.name}
-        </h3>
+        </Link>
 
         {(product.storeName || product.location) && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] sm:text-[11px] text-text-light/80">
-            {product.storeName && (
-              <span className="inline-flex items-center gap-1 min-w-0 max-w-full">
-                <Store className="w-3 h-3 flex-shrink-0 text-primary/60" />
-                <span className="line-clamp-1 truncate">{product.storeName}</span>
-              </span>
-            )}
+            {product.storeName &&
+              (storeHref ? (
+                <Link
+                  to={storeHref}
+                  className="inline-flex items-center gap-1 min-w-0 max-w-full rounded transition-colors hover:text-primary"
+                >
+                  <Store className="w-3 h-3 flex-shrink-0 text-primary/60" />
+                  <span className="line-clamp-1 truncate">{product.storeName}</span>
+                  {product.verified && <BadgeCheck className="w-3 h-3 flex-shrink-0 text-green-500" />}
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1 min-w-0 max-w-full">
+                  <Store className="w-3 h-3 flex-shrink-0 text-primary/60" />
+                  <span className="line-clamp-1 truncate">{product.storeName}</span>
+                </span>
+              ))}
             {product.location && (
               <span className="inline-flex items-center gap-1 min-w-0 max-w-full">
                 <MapPin className="w-3 h-3 flex-shrink-0 text-primary/60" />
@@ -206,6 +220,6 @@ export const CompactProductCard: React.FC<CompactProductCardProps> = ({ product,
           )}
         </div>
       </div>
-    </Link>
+    </div>
   );
 };

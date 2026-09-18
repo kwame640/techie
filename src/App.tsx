@@ -13,6 +13,7 @@ import { CustomerCheckout } from './pages/customer/CustomerCheckout';
 import { CustomerOrders } from './pages/customer/CustomerOrders';
 import { CustomerProfile } from './pages/customer/CustomerProfile';
 import { MarketplaceHome } from './pages/customer/MarketplaceHome';
+import { ProductSearch } from './pages/customer/ProductSearch';
 import { LaunchCountdown } from './components/LaunchCountdown';
 
 // Business Pages
@@ -156,6 +157,7 @@ function App() {
 
           {/* Customer Routes */}
           <Route path="/" element={<MarketplaceHome />} />
+          <Route path="/search" element={<ProductSearch />} />
           <Route path="/launch" element={<LaunchCountdownPage />} />
            <Route path="/discover" element={<BusinessDiscovery />} />
            <Route

@@ -5,8 +5,10 @@ import {
   Plus, Minus, Heart, ChevronLeft, ChevronRight, ArrowLeft,
 } from 'lucide-react';
 import { sampleProducts, sampleBusinesses } from '../../data/marketplaceData';
+import { products as shopCatalog } from '../../data/products';
 import { useShop } from '../../context/ShopContext';
 import type { Product as ShopProduct } from '../../types';
+import type { Business as MarketplaceBusiness, Product as MarketplaceProduct } from '../../types/marketplace';
 
 export const ProductPage = () => {
   const { productId } = useParams<{ productId: string }>();
@@ -15,8 +17,60 @@ export const ProductPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
 
-  const product = sampleProducts.find(p => p.id === productId);
-  const business = product ? sampleBusinesses.find(b => b.id === product.businessId) : null;
+  const marketProduct = sampleProducts.find(p => p.id === productId);
+  const shopListing = marketProduct ? undefined : shopCatalog.find(p => p.id === productId);
+
+  const product: MarketplaceProduct | undefined =
+    marketProduct ||
+    (shopListing
+      ? {
+          id: shopListing.id,
+          businessId: 'nkay-shop',
+          name: shopListing.name,
+          description: shopListing.description,
+          category: shopListing.category as MarketplaceProduct['category'],
+          price: shopListing.price,
+          discountPrice: shopListing.originalPrice,
+          images: [shopListing.image, ...(shopListing.images || []).slice(1)],
+          stock: shopListing.inStock ? 50 : 0,
+          status: shopListing.inStock ? ('active' as const) : ('out_of_stock' as const),
+          rating: shopListing.rating,
+          reviewCount: shopListing.reviews,
+          salesCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+      : undefined);
+
+  const business: MarketplaceBusiness | undefined = product
+    ? product.businessId === 'nkay-shop'
+      ? {
+          id: 'nkay-shop',
+          ownerId: 'nkay-shop',
+          name: 'NKAY Shop',
+          description: "NKAY's own curated collection of quality products delivered across Ghana.",
+          category: 'Other',
+          region: 'Greater Accra',
+          city: 'Accra',
+          area: 'Accra',
+          pickupLocation: 'Accra, Ghana',
+          phone: '0552951226',
+          email: 'support@nkay.com',
+          openingHours: {},
+          verificationStatus: 'approved',
+          storeUrl: '',
+          rating: 4.8,
+          reviewCount: shopCatalog.length,
+          followerCount: 0,
+          productCount: shopCatalog.length,
+          orderCount: 0,
+          status: 'live',
+          deliveryOptions: ['nkay_delivery'],
+          paymentMethods: [],
+          createdAt: new Date(),
+        }
+      : sampleBusinesses.find(b => b.id === product.businessId)
+    : undefined;
 
   if (!product || !business) {
     return (
@@ -83,7 +137,7 @@ export const ProductPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Back Link */}
         <Link
-          to={`/store/${business.id}`}
+          to={business.id === 'nkay-shop' ? '/' : `/store/${business.id}`}
           className="inline-flex items-center gap-2 text-text-light hover:text-primary transition-colors mb-6 text-sm"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -151,7 +205,7 @@ export const ProductPage = () => {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Link
-                to={`/store/${business.id}`}
+                to={business.id === 'nkay-shop' ? '/' : `/store/${business.id}`}
                 className="text-sm font-medium text-primary hover:underline"
               >
                 {business.name}
