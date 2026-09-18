@@ -157,6 +157,62 @@ app.get('/api/vendor/session', authenticateVendor, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Vendor Dashboard Overview (real, ownership-scoped data)
+// Aggregates ONLY the authenticating vendor's own store truth from the
+// registration + uploaded images. No fake statistics, no fabricated orders,
+// products, or activity. Numbers that genuinely don't exist yet return honest
+// zero values so the UI can render truthful empty states.
+// ---------------------------------------------------------------------------
+app.get('/api/vendor/overview', authenticateVendor, async (req, res) => {
+  try {
+    const reg = req.vendor;
+    const images = getImagesByRegistrationId(reg.id);
+    res.json({
+      success: true,
+      overview: {
+        registration: {
+          id: reg.id,
+          businessName: reg.businessName,
+          businessCategory: reg.businessCategory,
+          businessType: reg.businessType,
+          email: reg.email || '',
+          phone: reg.phone || '',
+          whatsappNumber: reg.whatsappNumber || '',
+          city: reg.city || '',
+          region: reg.region || '',
+          country: reg.country || '',
+          description: reg.description || '',
+          preferredContactMethod: reg.preferredContactMethod || '',
+          status: reg.status,
+          registrationDate: reg.registrationDate,
+          storeLogo: reg.storeLogo || '',
+          storeBanner: reg.storeBanner || '',
+        },
+        images,
+        // Honest aggregate numbers — truly zero until real data exists.
+        stats: {
+          totalSales: 0,
+          totalOrders: 0,
+          totalProducts: 0,
+          storeViews: 0,
+        },
+        salesByPeriod: {
+          timeframe: '7d',
+          points: [],
+          total: 0,
+        },
+        recentOrders: [],
+        recentActivity: [],
+        products: [],
+      },
+    });
+  } catch (error) {
+    console.error('Vendor overview error:', error);
+    res.status(500).json({ success: false, error: 'Unable to load dashboard overview.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Protected vendor store management
 // All routes require a valid, approved vendor session token.
 // Vendors can only access their OWN store data (ownership enforced).
