@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ShopProvider } from './context/ShopContext';
@@ -89,7 +89,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
 };
 
 // Protected route that verifies the vendor session with the BACKEND.
-// The frontend is NEVER the final authority — the backend
+// The frontend is NEVER the final authority â€” the backend
 // (/api/vendor/session) re-checks the signed token and the live approval
 // status stored in the database on every request.
 const BusinessProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -323,10 +323,10 @@ function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-          </Router>
+        <CartMenu />
+      </Router>
         </NotificationProvider>
       </AuthProvider>
-      <CartMenu />
     </ShopProvider>
   );
 }
