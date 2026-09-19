@@ -110,7 +110,6 @@ export const ProductPage = () => {
 
   const handleAddToCart = () => {
     addToCart(shopProduct, quantity);
-    navigate('/customer/cart');
   };
 
   const handleBuyNow = () => {

@@ -1,9 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem } from '../types';
 
+export interface LastAddedItem {
+  product: Product;
+  quantity: number;
+}
+
 interface ShopContextType {
   cart: CartItem[];
   wishlist: Product[];
+  lastAdded: LastAddedItem | null;
   addToCart: (product: Product, quantity?: number, color?: string, size?: string) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
@@ -19,6 +25,7 @@ const ShopContext = createContext<ShopContextType | undefined>(undefined);
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
+  const [lastAdded, setLastAdded] = useState<LastAddedItem | null>(null);
   
   // Load from localStorage
   useEffect(() => {
@@ -50,6 +57,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return [...prev, { product, quantity, selectedColor: color, selectedSize: size }];
     });
+    setLastAdded({ product, quantity });
   };
   
   const removeFromCart = (productId: string) => {
@@ -91,6 +99,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         cart,
         wishlist,
+        lastAdded,
         addToCart,
         removeFromCart,
         updateQuantity,

@@ -15,6 +15,7 @@ import { CustomerProfile } from './pages/customer/CustomerProfile';
 import { MarketplaceHome } from './pages/customer/MarketplaceHome';
 import { ProductSearch } from './pages/customer/ProductSearch';
 import { LaunchCountdown } from './components/LaunchCountdown';
+import { CartMenu } from './components/CartMenu';
 
 // Business Pages
 import { BusinessDashboard } from './pages/business/BusinessDashboard';
@@ -325,6 +326,7 @@ function App() {
           </Router>
         </NotificationProvider>
       </AuthProvider>
+      <CartMenu />
     </ShopProvider>
   );
 }
