@@ -28,7 +28,7 @@ interface CompactProductCardProps {
 }
 
 export const CompactProductCard: React.FC<CompactProductCardProps> = ({ product, eager = false }) => {
-  const { addToWishlist, isInWishlist, addToCart } = useShop();
+  const { addToWishlist, isInWishlist } = useShop();
   const [liked, setLiked] = useState(isInWishlist(product.id));
   const [imageError, setImageError] = useState(false);
 
@@ -64,28 +64,6 @@ export const CompactProductCard: React.FC<CompactProductCardProps> = ({ product,
       };
       addToWishlist(shopProduct as any);
     }
-  };
-
-  const quickAdd = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    const shopProduct = {
-      id: product.id,
-      name: product.name,
-      description: product.category || 'NKAY Marketplace',
-      price: product.price,
-      originalPrice: product.originalPrice,
-      discount: discountPct || undefined,
-      image: product.image,
-      images: [product.image],
-      category: product.category || 'General',
-      rating: product.rating ?? 4.5,
-      reviews: product.reviews ?? 0,
-      colors: [],
-      sizes: [],
-      inStock: true,
-    };
-    addToCart(shopProduct as any);
   };
 
   const productHref = `/product/${product.id}`;
@@ -148,13 +126,6 @@ export const CompactProductCard: React.FC<CompactProductCardProps> = ({ product,
             />
           </button>
         </div>
-
-        <button
-          onClick={quickAdd}
-          className="absolute left-1.5 right-1.5 sm:left-2 sm:right-2 bottom-1.5 sm:bottom-2 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 bg-primary/95 hover:bg-primary text-white text-[11px] sm:text-xs font-semibold py-1.5 sm:py-2 rounded-lg shadow-md whitespace-nowrap"
-        >
-          + Quick Add
-        </button>
       </div>
 
       <div className="flex-1 flex flex-col p-2.5 sm:p-3 gap-1 min-h-[112px] sm:min-h-[120px]">

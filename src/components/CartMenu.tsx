@@ -9,20 +9,17 @@ export const CartMenu: React.FC = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
-  const timerRef = useRef<number | null>(null);
+  const openedAtRef = useRef(0);
 
   useEffect(() => {
     if (!lastAdded) return;
+    openedAtRef.current = Date.now();
     setClosing(false);
     setOpen(true);
-    if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(close, 5000);
-    return () => {
-      if (timerRef.current) window.clearTimeout(timerRef.current);
-    };
   }, [lastAdded]);
 
   const close = () => {
+    if (Date.now() - openedAtRef.current < 300) return;
     setClosing(true);
     window.setTimeout(() => setOpen(false), 200);
   };
