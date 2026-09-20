@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User } from '../types/marketplace';
 import { auth } from '../firebase';
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, signOutUser } from '../firebase';
@@ -18,6 +18,8 @@ interface AuthContextType {
   loginWithGoogle: (role: 'customer' | 'business' | 'driver' | 'admin') => Promise<void>;
   logout: () => void;
   verifyVendorSession: () => Promise<boolean>;
+  isNewUser: boolean;
+  clearNewUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -164,6 +166,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [driver, setDriver] = useState<any | null>(null);
   const [admin, setAdmin] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [newUser, setNewUser] = useState(false);
+
+  const clearNewUser = useCallback(() => setNewUser(false), []);
 
   const verifyVendorSession = async () => {
     const token = localStorage.getItem('vendorToken');
@@ -259,16 +264,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string, role: 'customer' | 'business' | 'driver' | 'admin') => {
     try {
       let firebaseUser;
+      let isNewSignUp = false;
 
       if (role === 'business') {
         try {
-          firebaseUser = await signInWithEmail(email, password);
+          const result = await signInWithEmail(email, password);
+          firebaseUser = result.user;
         } catch (signInError: any) {
           if (signInError?.code !== 'auth/invalid-credential') throw signInError;
-          firebaseUser = await signUpWithEmail(email, password);
+          const signupResult = await signUpWithEmail(email, password);
+          firebaseUser = signupResult.user;
+          isNewSignUp = true;
         }
       } else {
-        firebaseUser = await signInWithEmail(email, password);
+        const result = await signInWithEmail(email, password);
+        firebaseUser = result.user;
       }
 
       const userData = createUserData(firebaseUser, role, email);
@@ -285,6 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('userRole', role);
+      if (isNewSignUp) setNewUser(true);
     } catch (error) {
       console.error('Login error:', error);
       if (role === 'business') await signOutUser();
@@ -303,8 +314,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signup = async (email: string, password: string, role: 'customer' | 'business' | 'driver' | 'admin') => {
     try {
-      const firebaseUser = await signUpWithEmail(email, password);
-      const userData = createUserData(firebaseUser, role, email);
+      const result = await signUpWithEmail(email, password);
+      const userData = createUserData(result.user, role, email);
       
       if (role === 'customer') {
         setUser(userData);
@@ -318,6 +329,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('userRole', role);
+      if (result.isNewUser) setNewUser(true);
     } catch (error) {
       console.error('Signup error:', error);
       throw error;
@@ -326,10 +338,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async (role: 'customer' | 'business' | 'driver' | 'admin') => {
     try {
-      const firebaseUser = await signInWithGoogle();
+      const result = await signInWithGoogle();
       const userData = role === 'business'
-        ? await getApprovedBusiness(firebaseUser.displayName || '', firebaseUser.email || '')
-        : createUserData(firebaseUser, role, firebaseUser.email || '');
+        ? await getApprovedBusiness(result.user.displayName || '', result.user.email || '')
+        : createUserData(result.user, role, result.user.email || '');
       
       if (role === 'customer') {
         setUser(userData);
@@ -343,6 +355,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('userRole', role);
+      if (result.isNewUser) setNewUser(true);
     } catch (error) {
       console.error('Google sign-in error:', error);
       if (role === 'business') await signOutUser();
@@ -357,6 +370,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setBusiness(null);
       setDriver(null);
       setAdmin(null);
+      setNewUser(false);
       localStorage.removeItem('user');
       localStorage.removeItem('userRole');
       localStorage.removeItem('vendorSession');
@@ -370,7 +384,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAuthenticated = !!user || !!business || !!driver || !!admin;
 
   return (
-    <AuthContext.Provider value={{ user, business, driver, admin, isAuthenticated, isLoading, login, loginVendor, signup, loginWithGoogle, logout, verifyVendorSession }}>
+    <AuthContext.Provider value={{ user, business, driver, admin, isAuthenticated, isLoading, login, loginVendor, signup, loginWithGoogle, logout, verifyVendorSession, isNewUser: newUser, clearNewUser }}>
       {children}
     </AuthContext.Provider>
   );

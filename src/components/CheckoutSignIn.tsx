@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, LockKeyhole } from 'lucide-react';
+import { X, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -121,20 +121,174 @@ export const CheckoutSignInForm: React.FC<{ onCancel?: () => void }> = ({ onCanc
   );
 };
 
-export const CheckoutSignInModal: React.FC = () => {
-  const { pendingCheckout, clearPendingCheckout } = useShop();
-  const { user } = useAuth();
-  const navigate = useNavigate();
+export const CheckoutOtpForm: React.FC<{
+  email: string;
+  onVerified: () => void;
+  onCancel?: () => void;
+}> = ({ email, onVerified, onCancel }) => {
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [devCode, setDevCode] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+
+  const sendCode = useCallback(async () => {
+    setError('');
+    try {
+      const res = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.error || 'Could not send your code. Please try again.');
+        if (typeof data?.waitSec === 'number') {
+          setCooldown(data.waitSec);
+        }
+        return;
+      }
+      if (data?.devCode) setDevCode(data.devCode);
+      setCooldown(60);
+    } catch {
+      setError('Could not reach the server. Please try again.');
+    }
+  }, [email]);
 
   useEffect(() => {
-    if (pendingCheckout && user) {
-      const target = pendingCheckout;
-      clearPendingCheckout();
-      navigate(target, { replace: true });
-    }
-  }, [pendingCheckout, user, clearPendingCheckout, navigate]);
+    sendCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
 
-  if (!pendingCheckout || user) return null;
+  useEffect(() => {
+    if (!devCode) return;
+    setCode(devCode);
+  }, [devCode]);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((current) => current - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+
+  const verify = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(code)) {
+      setError('Enter the 6-digit code.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.error || 'Verification failed. Please try again.');
+        return;
+      }
+      onVerified();
+    } catch {
+      setError('Could not reach the server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <p className="text-sm text-[#927f74] mb-5">
+        We sent a 6-digit code to <span className="font-semibold text-[#4e362a]">{email}</span>. Enter it below to
+        finish verifying your account.
+      </p>
+
+      {devCode && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
+          Test mode: email sending is not configured, so the code was shown on the server. It has been filled in for you.
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>
+      )}
+
+      <form onSubmit={verify} className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-[#4e362a]">Verification code</label>
+          <input
+            autoFocus
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="••••••"
+            className="mt-2 w-full h-14 rounded-xl border border-[#e7ddd7] px-3 text-center text-2xl font-bold tracking-[0.6em] outline-none focus:border-[#6f3d27]"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading || code.length !== 6}
+          className="w-full bg-[#6f3d27] text-white py-3 rounded-xl text-sm font-semibold hover:bg-[#5d3524] transition disabled:opacity-60"
+        >
+          {loading ? 'Verifying...' : 'Verify & Continue to Checkout'}
+        </button>
+      </form>
+
+      <div className="flex items-center justify-between mt-5">
+        <button
+          type="button"
+          onClick={sendCode}
+          disabled={cooldown > 0 || loading}
+          className="text-xs font-semibold text-[#6f3d27] hover:underline disabled:text-[#b8a89f] disabled:no-underline disabled:cursor-default transition"
+        >
+          {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-xs font-medium text-[#9a887d] hover:text-[#6f3d27] transition"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const CheckoutSignInModal: React.FC = () => {
+  const { pendingCheckout, clearPendingCheckout } = useShop();
+  const { user, isNewUser, clearNewUser } = useAuth();
+  const navigate = useNavigate();
+  const [otpStep, setOtpStep] = useState(false);
+
+  const goToCheckout = useCallback(() => {
+    const target = pendingCheckout || '/customer/checkout';
+    clearPendingCheckout();
+    clearNewUser();
+    navigate(target, { replace: true });
+  }, [pendingCheckout, clearPendingCheckout, clearNewUser, navigate]);
+
+  useEffect(() => {
+    if (!pendingCheckout || !user) {
+      setOtpStep(false);
+      return;
+    }
+    if (isNewUser) {
+      setOtpStep(true);
+    } else {
+      goToCheckout();
+    }
+  }, [pendingCheckout, user, isNewUser, goToCheckout]);
+
+  if (!pendingCheckout || !user) return null;
+
+  const otpVisible = otpStep && isNewUser;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
@@ -151,10 +305,20 @@ export const CheckoutSignInModal: React.FC = () => {
         >
           <X className="w-5 h-5" />
         </button>
-        <div className="w-12 h-12 rounded-2xl bg-[#f5ebe5] text-[#6f3d27] flex items-center justify-center mb-4"><LockKeyhole className="w-6 h-6" /></div>
-        <h2 className="text-xl font-bold text-[#2d211b]">Sign in to continue</h2>
-        <p className="text-sm text-[#927f74] mt-1.5 mb-6">Sign in to your account to complete checkout.</p>
-        <CheckoutSignInForm onCancel={clearPendingCheckout} />
+        <div className="w-12 h-12 rounded-2xl bg-[#f5ebe5] text-[#6f3d27] flex items-center justify-center mb-4">
+          {otpVisible ? <ShieldCheck className="w-6 h-6" /> : <LockKeyhole className="w-6 h-6" />}
+        </div>
+        <h2 className="text-xl font-bold text-[#2d211b]">
+          {otpVisible ? 'Verify your email' : 'Sign in to continue'}
+        </h2>
+        {otpVisible ? (
+          <div className="mt-4">
+            <CheckoutOtpForm email={user.email} onVerified={goToCheckout} onCancel={clearPendingCheckout} />
+          </div>
+        ) : (
+          <p className="text-sm text-[#927f74] mt-1.5 mb-6">Sign in to your account to complete checkout.</p>
+        )}
+        {otpVisible ? null : <CheckoutSignInForm onCancel={clearPendingCheckout} />}
       </div>
     </div>
   );

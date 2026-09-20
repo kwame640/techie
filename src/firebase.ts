@@ -35,7 +35,7 @@ export const googleProvider = new GoogleAuthProvider();
 export const signUpWithEmail = async (email: string, password: string) => {
   try {
     const result = await createUserWithEmailAndPassword(auth, email, password);
-    return result.user;
+    return { user: result.user, isNewUser: true };
   } catch (error) {
     console.error('Sign up error:', error);
     throw error;
@@ -46,7 +46,7 @@ export const signUpWithEmail = async (email: string, password: string) => {
 export const signInWithEmail = async (email: string, password: string) => {
   try {
     const result = await signInWithEmailAndPassword(auth, email, password);
-    return result.user;
+    return { user: result.user, isNewUser: false };
   } catch (error) {
     console.error('Email sign-in error:', error);
     throw error;
@@ -57,11 +57,20 @@ export const signInWithEmail = async (email: string, password: string) => {
 export const signInWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
+    return { user: result.user, isNewUser: isFirstSignIn(result.user) };
   } catch (error) {
     console.error('Google sign-in error:', error);
     throw error;
   }
+};
+
+// Firebase v12 no longer exposes additionalUserInfo.isNewUser on sign-in results.
+// A brand-new account has creationTime equal to lastSignInTime on its first sign-in.
+const isFirstSignIn = (firebaseUser: any): boolean => {
+  const metadata = firebaseUser?.metadata;
+  const created = metadata?.creationTime;
+  const last = metadata?.lastSignInTime;
+  return Boolean(created && created === last);
 };
 
 export const signOutUser = async () => {

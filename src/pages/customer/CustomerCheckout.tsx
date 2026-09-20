@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, CreditCard, LockKeyhole, MapPin, Phone, ShieldCheck, ShoppingBag, Store, WalletCards } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
 import { useAuth } from '../../context/AuthContext';
-import { CheckoutSignInForm } from '../../components/CheckoutSignIn';
+import { CheckoutOtpForm, CheckoutSignInForm } from '../../components/CheckoutSignIn';
 import mtnMomoLogo from '../../images/mtn-momo.svg';
 
 type Step = 1 | 2 | 3;
@@ -14,12 +14,13 @@ const providers = [{ id: 'mtn', name: 'MTN MoMo', logo: mtnMomoLogo }, { id: 'te
 
 export const CustomerCheckout = () => {
   const { cart, cartTotal } = useShop();
-  const { user } = useAuth();
+  const { user, isNewUser, clearNewUser } = useAuth();
   const [step, setStep] = useState<Step>(1);
   const [delivery, setDelivery] = useState<'home' | 'pickup'>('home');
   const [method, setMethod] = useState<PaymentMethod>('mobile');
   const [provider, setProvider] = useState('mtn');
   const [processing, setProcessing] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', region: '', city: '', area: '', momo: '', card: '', expiry: '', cvv: '' });
   const update = (field: keyof typeof form, value: string) => setForm((current) => ({ ...current, [field]: value }));
@@ -31,6 +32,8 @@ export const CustomerCheckout = () => {
   if (!cart.length) return <div className="min-h-screen bg-[#faf8f6] flex items-center justify-center p-4"><div className="bg-white border border-[#eee5df] rounded-2xl p-8 text-center"><ShoppingBag className="w-9 h-9 mx-auto text-[#6f3d27]" /><h1 className="text-2xl font-bold mt-4">Your cart is empty</h1><Link to="/" className="inline-flex mt-6 bg-[#6f3d27] text-white rounded-xl px-5 py-3 font-semibold">Continue shopping</Link></div></div>;
 
   if (!user) return <div className="min-h-screen bg-[#faf8f6] text-[#2d211b]"><header className="bg-white border-b border-[#eee5df]"><div className="max-w-7xl mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between"><Link to="/" className="text-sm font-semibold text-[#6f3d27] flex items-center gap-2"><ArrowLeft className="w-4 h-4" />NKAY Marketplace</Link><span className="flex items-center gap-2 text-xs text-[#806e64]"><LockKeyhole className="w-4 h-4 text-[#6f3d27]" />Secure checkout</span></div></header><main className="max-w-7xl mx-auto px-4 sm:px-6 py-8"><div className="max-w-md mx-auto bg-white border border-[#eee5df] rounded-2xl p-6 sm:p-8"><div className="w-12 h-12 rounded-2xl bg-[#f5ebe5] text-[#6f3d27] flex items-center justify-center mb-4"><LockKeyhole className="w-6 h-6" /></div><h1 className="text-xl font-bold">Sign in to continue</h1><p className="text-sm text-[#927f74] mt-1.5 mb-6">Sign in to your account to complete checkout.</p><CheckoutSignInForm /><Link to="/" className="block text-center text-xs font-medium text-[#9a887d] hover:text-[#6f3d27] mt-5 transition">Continue shopping</Link></div></main></div>;
+
+  if (isNewUser && !otpVerified) return <div className="min-h-screen bg-[#faf8f6] text-[#2d211b]"><header className="bg-white border-b border-[#eee5df]"><div className="max-w-7xl mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between"><Link to="/" className="text-sm font-semibold text-[#6f3d27] flex items-center gap-2"><ArrowLeft className="w-4 h-4" />NKAY Marketplace</Link><span className="flex items-center gap-2 text-xs text-[#806e64]"><ShieldCheck className="w-4 h-4 text-[#6f3d27]" />Secure checkout</span></div></header><main className="max-w-7xl mx-auto px-4 sm:px-6 py-8"><div className="max-w-md mx-auto bg-white border border-[#eee5df] rounded-2xl p-6 sm:p-8"><div className="w-12 h-12 rounded-2xl bg-[#f5ebe5] text-[#6f3d27] flex items-center justify-center mb-4"><ShieldCheck className="w-6 h-6" /></div><h1 className="text-xl font-bold">Verify your email</h1><div className="mt-4"><CheckoutOtpForm email={user.email} onVerified={() => { setOtpVerified(true); clearNewUser(); }} /></div></div></main></div>;
 
   return <div className="min-h-screen bg-[#faf8f6] text-[#2d211b]">
     <header className="bg-white border-b border-[#eee5df]"><div className="max-w-7xl mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between"><Link to="/" className="text-sm font-semibold text-[#6f3d27] flex items-center gap-2"><ArrowLeft className="w-4 h-4" />NKAY Marketplace</Link><span className="flex items-center gap-2 text-xs text-[#806e64]"><LockKeyhole className="w-4 h-4 text-[#6f3d27]" />Secure checkout</span></div></header>

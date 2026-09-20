@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { randomInt } from 'crypto';
+import { getOtp, saveOtp, updateOtp, deleteOtp } from './models/otpModel.js';
+import { sendOtpEmail } from './services/emailService.js';
 import { registerBusiness } from './controllers/businessController.js';
 import { getRegistrations, getRegistration, updateStatus, getStats, adminLogin, deleteImage, uploadImage, getPublicRegistrations, getPublicRegistration } from './controllers/adminController.js';
 import { subscribe, unsubscribe, sendNotification, sendTestNotification } from './controllers/pushController.js';
@@ -326,6 +329,103 @@ app.post('/api/push/subscribe', subscribe);
 app.post('/api/push/unsubscribe', unsubscribe);
 app.post('/api/push/send', authenticateAdmin, sendNotification);
 app.post('/api/push/test', sendTestNotification);
+
+// ---------------------------------------------------------------------------
+// Checkout OTP verification
+// New customers must verify their email with a one-time passcode before
+// proceeding to checkout. Codes are stored server-side, expire after 5
+// minutes, and are limited to 5 verification attempts.
+// ---------------------------------------------------------------------------
+const OTP_TTL_MS = 5 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+
+// POST /api/otp/send — creates + sends a new code for an email
+app.post('/api/otp/send', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, error: 'A valid email is required.' });
+    }
+
+    const existing = await getOtp(email);
+    if (existing?.lastSentAt) {
+      const elapsed = Date.now() - Date.parse(existing.lastSentAt);
+      if (elapsed < OTP_RESEND_COOLDOWN_MS) {
+        const waitSec = Math.max(1, Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000));
+        return res.status(429).json({ success: false, error: `Please wait ${waitSec} seconds before requesting another code.`, waitSec });
+      }
+    }
+
+    const code = String(randomInt(0, 1000000)).padStart(6, '0');
+    const now = new Date().toISOString();
+
+    await saveOtp(email, {
+      email,
+      code,
+      attempts: 0,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS).toISOString(),
+      lastSentAt: now,
+      createdAt: existing?.createdAt || now,
+    });
+
+    const deliveryResult = await sendOtpEmail(email, code);
+    if (!deliveryResult.success) {
+      return res.status(500).json({ success: false, error: 'We could not send your verification code. Please try again.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      delivery: deliveryResult.delivery,
+      devCode: deliveryResult.delivery === 'dev' ? code : undefined,
+      expiresInSec: Math.floor(OTP_TTL_MS / 1000),
+    });
+  } catch (error) {
+    console.error('OTP send error:', error);
+    return res.status(500).json({ success: false, error: 'Unable to send verification code.' });
+  }
+});
+
+// POST /api/otp/verify — checks the submitted code, then deletes it
+app.post('/api/otp/verify', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const code = String(req.body?.code || '').trim();
+
+    if (!email || !code) {
+      return res.status(400).json({ success: false, error: 'Email and code are required.' });
+    }
+
+    const otp = await getOtp(email);
+    if (!otp) {
+      return res.status(400).json({ success: false, error: 'No verification code was found. Request a new code.' });
+    }
+    if (Date.parse(otp.expiresAt) < Date.now()) {
+      await deleteOtp(email);
+      return res.status(400).json({ success: false, error: 'This code has expired. Request a new code.' });
+    }
+    if ((otp.attempts || 0) >= OTP_MAX_ATTEMPTS) {
+      await deleteOtp(email);
+      return res.status(429).json({ success: false, error: 'Too many incorrect attempts. Request a new code.' });
+    }
+
+    if (String(otp.code).trim() !== code) {
+      const attempts = (otp.attempts || 0) + 1;
+      await updateOtp(email, { attempts });
+      return res.status(400).json({
+        success: false,
+        error: 'Incorrect code. Please check the code and try again.',
+        attemptsLeft: Math.max(0, OTP_MAX_ATTEMPTS - attempts),
+      });
+    }
+
+    await deleteOtp(email);
+    return res.status(200).json({ success: true, message: 'Verification successful' });
+  } catch (error) {
+    console.error('OTP verify error:', error);
+    return res.status(500).json({ success: false, error: 'Unable to verify code.' });
+  }
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
