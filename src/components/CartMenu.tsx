@@ -2,10 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Check, X, ShoppingBag } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
+import { useAuth } from '../context/AuthContext';
 import { formatGhc } from '../lib/utils';
 
 export const CartMenu: React.FC = () => {
   const { lastAdded, cartTotal, cartCount } = useShop();
+  const { user } = useAuth();
+  const { requestCheckout } = useShop();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -36,7 +39,11 @@ export const CartMenu: React.FC = () => {
 
   const goToCheckout = () => {
     close();
-    navigate('/customer/checkout');
+    if (user) {
+      navigate('/customer/checkout');
+    } else {
+      requestCheckout('/customer/checkout');
+    }
   };
 
   return (

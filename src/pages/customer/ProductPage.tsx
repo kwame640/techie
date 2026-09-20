@@ -7,13 +7,15 @@ import {
 import { sampleProducts, sampleBusinesses } from '../../data/marketplaceData';
 import { products as shopCatalog } from '../../data/products';
 import { useShop } from '../../context/ShopContext';
+import { useAuth } from '../../context/AuthContext';
 import type { Product as ShopProduct } from '../../types';
 import type { Business as MarketplaceBusiness, Product as MarketplaceProduct } from '../../types/marketplace';
 
 export const ProductPage = () => {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
-  const { addToCart, addToWishlist, isInWishlist } = useShop();
+  const { addToCart, addToWishlist, isInWishlist, requestCheckout } = useShop();
+  const { user } = useAuth();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
 
@@ -114,7 +116,11 @@ export const ProductPage = () => {
 
   const handleBuyNow = () => {
     addToCart(shopProduct, quantity);
-    navigate('/customer/checkout');
+    if (user) {
+      navigate('/customer/checkout');
+    } else {
+      requestCheckout('/customer/checkout');
+    }
   };
 
   const handleWishlist = () => {

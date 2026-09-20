@@ -16,6 +16,7 @@ import { MarketplaceHome } from './pages/customer/MarketplaceHome';
 import { ProductSearch } from './pages/customer/ProductSearch';
 import { LaunchCountdown } from './components/LaunchCountdown';
 import { CartMenu } from './components/CartMenu';
+import { CheckoutSignInModal } from './components/CheckoutSignIn';
 
 // Business Pages
 import { BusinessDashboard } from './pages/business/BusinessDashboard';
@@ -324,6 +325,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <CartMenu />
+        <CheckoutSignInModal />
       </Router>
         </NotificationProvider>
       </AuthProvider>

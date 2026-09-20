@@ -6,6 +6,7 @@ import {
   ArrowLeft, Package, AlertCircle,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
+import { useAuth } from '../../context/AuthContext';
 import { safeFetchJson } from '../../lib/fetch';
 import { sampleBusinesses, sampleProducts } from '../../data/marketplaceData';
 import { Business, Product as MarketplaceProduct } from '../../types/marketplace';
@@ -44,7 +45,8 @@ const storeNav = [
 export const StorePage = () => {
   const { storeId } = useParams<{ storeId: string }>();
   const navigate = useNavigate();
-  const { addToCart } = useShop();
+  const { addToCart, requestCheckout } = useShop();
+  const { user } = useAuth();
   const [business, setBusiness] = useState<Business | null>(null);
   const [searched, setSearched] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -163,7 +165,11 @@ export const StorePage = () => {
 
   const handleBuyNow = (product: ShopProduct) => {
     addToCart(product);
-    navigate('/customer/checkout');
+    if (user) {
+      navigate('/customer/checkout');
+    } else {
+      requestCheckout('/customer/checkout');
+    }
   };
 
   if (!searched) {
