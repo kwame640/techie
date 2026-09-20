@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, BarChart3, Clock3, DollarSign, Package, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -8,11 +9,28 @@ const orderStatus = (status: string) => status === 'new' ? 'Pending' : status ==
 
 export const BusinessDashboard = () => {
   const { business } = useAuth();
-  const orders: Order[] = [];
-  const products: Product[] = [];
-  const visibleOrders = orders;
-  const visibleProducts = products;
-  const chart = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const token = business?.vendorToken || localStorage.getItem('vendorToken') || '';
+  const [overview, setOverview] = useState<{ stats: { totalSales: number; totalOrders: number; totalProducts: number; storeViews: number }; recentOrders: Order[]; products: Product[]; registration: { businessName: string } | null; salesByPeriod: { points: number[]; total: number } } | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!token) return;
+      try {
+        const res = await fetch('/api/vendor/overview', { headers: { Authorization: `Bearer ${token}` } });
+        if (res.status === 401 || res.status === 403) return;
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success || !data?.overview) return;
+        setOverview(data.overview);
+      } catch {
+        return;
+      }
+    };
+    load();
+  }, [token]);
+
+  const visibleOrders = overview?.recentOrders ?? [];
+  const visibleProducts = overview?.products ?? [];
+  const chart = overview?.salesByPeriod.points?.length ? overview.salesByPeriod.points : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
   return <VendorLayout title="Dashboard"><PageHeading eyebrow="Tuesday, September 5" title={`Welcome back, ${business?.name || 'Vendor'} 👋`} description="Manage your store, products and orders from one place." />
     <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-7">

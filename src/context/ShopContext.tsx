@@ -10,9 +10,14 @@ interface ShopContextType {
   cart: CartItem[];
   wishlist: Product[];
   lastAdded: LastAddedItem | null;
+  pendingCheckout: string | null;
+  checkoutEmail: string;
   addToCart: (product: Product, quantity?: number, color?: string, size?: string) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
+  requestCheckout: (path: string) => void;
+  clearPendingCheckout: () => void;
+  setCheckoutEmail: (email: string) => void;
   addToWishlist: (product: Product) => void;
   removeFromWishlist: (productId: string) => void;
   isInWishlist: (productId: string) => boolean;
@@ -26,6 +31,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [lastAdded, setLastAdded] = useState<LastAddedItem | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
+  const [checkoutEmail, setCheckoutEmail] = useState('');
   
   // Load from localStorage
   useEffect(() => {
@@ -60,6 +67,10 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLastAdded({ product, quantity });
   };
   
+  const requestCheckout = (path: string) => setPendingCheckout(path);
+
+  const clearPendingCheckout = () => setPendingCheckout(null);
+
   const removeFromCart = (productId: string) => {
     setCart(prev => prev.filter(item => item.product.id !== productId));
   };
@@ -100,9 +111,14 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         cart,
         wishlist,
         lastAdded,
+        pendingCheckout,
+        checkoutEmail,
         addToCart,
         removeFromCart,
         updateQuantity,
+        requestCheckout,
+        clearPendingCheckout,
+        setCheckoutEmail,
         addToWishlist,
         removeFromWishlist,
         isInWishlist,
