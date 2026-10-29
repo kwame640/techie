@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Star, Store, Truck, MapPin, Check,
@@ -7,17 +7,23 @@ import {
 import { sampleProducts, sampleBusinesses } from '../../data/marketplaceData';
 import { products as shopCatalog } from '../../data/products';
 import { useShop } from '../../context/ShopContext';
-import { useAuth } from '../../context/AuthContext';
 import type { Product as ShopProduct } from '../../types';
 import type { Business as MarketplaceBusiness, Product as MarketplaceProduct } from '../../types/marketplace';
 
 export const ProductPage = () => {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
-  const { addToCart, addToWishlist, isInWishlist, requestCheckout } = useShop();
-  const { user } = useAuth();
+  const { addToCart, addToWishlist, isInWishlist } = useShop();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
+  const [justAdded, setJustAdded] = useState(false);
+  const addedTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (addedTimerRef.current) window.clearTimeout(addedTimerRef.current);
+    };
+  }, []);
 
   const marketProduct = sampleProducts.find(p => p.id === productId);
   const shopListing = marketProduct ? undefined : shopCatalog.find(p => p.id === productId);
@@ -31,8 +37,8 @@ export const ProductPage = () => {
           name: shopListing.name,
           description: shopListing.description,
           category: shopListing.category as MarketplaceProduct['category'],
-          price: shopListing.price,
-          discountPrice: shopListing.originalPrice,
+          price: shopListing.originalPrice || shopListing.price,
+          discountPrice: shopListing.originalPrice ? shopListing.price : undefined,
           images: [shopListing.image, ...(shopListing.images || []).slice(1)],
           stock: shopListing.inStock ? 50 : 0,
           status: shopListing.inStock ? ('active' as const) : ('out_of_stock' as const),
@@ -85,13 +91,16 @@ export const ProductPage = () => {
     );
   }
 
+  const hasDiscount = Boolean(product.discountPrice && product.discountPrice < product.price);
+  const price = hasDiscount && product.discountPrice ? product.discountPrice : product.price;
+
   const shopProduct: ShopProduct = {
     id: product.id,
     name: product.name,
     description: product.description,
-    price: product.price,
-    originalPrice: product.discountPrice,
-    image: product.images?.[0] || '/api/placeholder/400/400',
+    price,
+    originalPrice: hasDiscount ? product.price : undefined,
+    image: product.images?.[0] || '/products/placeholder.svg',
     images: product.images || [],
     category: product.category,
     rating: product.rating,
@@ -99,28 +108,26 @@ export const ProductPage = () => {
     colors: [],
     sizes: [],
     inStock: product.stock > 0,
-    discount: product.discountPrice
-      ? Math.round(((product.price - product.discountPrice) / product.price) * 100)
+    discount: hasDiscount
+      ? Math.round(((product.price - price) / product.price) * 100)
       : undefined,
   };
 
-  const price = product.discountPrice || product.price;
-  const discount = product.discountPrice
-    ? Math.round(((product.price - product.discountPrice) / product.price) * 100)
+  const discount = hasDiscount
+    ? Math.round(((product.price - price) / product.price) * 100)
     : 0;
   const availableQty = product.stock > 0 ? product.stock : 0;
 
   const handleAddToCart = () => {
     addToCart(shopProduct, quantity);
+    setJustAdded(true);
+    if (addedTimerRef.current) window.clearTimeout(addedTimerRef.current);
+    addedTimerRef.current = window.setTimeout(() => setJustAdded(false), 1600);
   };
 
   const handleBuyNow = () => {
-    addToCart(shopProduct, quantity);
-    if (user) {
-      navigate('/customer/checkout');
-    } else {
-      requestCheckout('/customer/checkout');
-    }
+    // Buy Now skips the cart and prices this exact product + quantity at checkout.
+    navigate(`/customer/checkout?productId=${encodeURIComponent(product.id)}&qty=${quantity}`);
   };
 
   const handleWishlist = () => {
@@ -135,7 +142,7 @@ export const ProductPage = () => {
     setQuantity(newVal);
   };
 
-  const images = product.images && product.images.length > 0 ? product.images : ['/api/placeholder/400/400'];
+  const images = product.images && product.images.length > 0 ? product.images : ['/products/placeholder.svg'];
 
   return (
     <div className="min-h-screen bg-background">
@@ -239,7 +246,7 @@ export const ProductPage = () => {
 
             <div className="flex items-center gap-3 mb-6">
               <span className="text-3xl font-bold text-primary">GH₵{price.toLocaleString()}</span>
-              {product.discountPrice && (
+              {hasDiscount && (
                 <>
                   <span className="text-xl text-text-light line-through">GH₵{product.price.toLocaleString()}</span>
                   <span className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold">
@@ -277,25 +284,37 @@ export const ProductPage = () => {
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <button
-                onClick={handleAddToCart}
+                onClick={handleBuyNow}
                 disabled={product.stock === 0}
                 className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-3.5 rounded-2xl text-base font-semibold hover:bg-primary/90 transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <ShoppingCart className="w-5 h-5" />
-                Add to Cart
+                Buy Now
               </button>
               <button
-                onClick={handleBuyNow}
+                onClick={handleAddToCart}
                 disabled={product.stock === 0}
                 className={`flex-1 py-3.5 rounded-2xl text-base font-semibold transition flex items-center justify-center gap-2 border ${
                   product.stock === 0
                     ? 'border-gray-200 text-gray-400 cursor-not-allowed'
                     : 'border-primary text-primary hover:bg-primary hover:text-white'
-                }`}
+                } ${justAdded ? 'animate-added-pop' : ''}`}
               >
-                Buy Now
+                {justAdded ? (
+                  <>
+                    <Check className="w-5 h-5 animate-check-pop" />
+                    Added to cart
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="w-5 h-5" />
+                    Add to Cart
+                  </>
+                )}
               </button>
             </div>
+            <span className="sr-only" role="status" aria-live="polite">
+              {justAdded ? `${product.name} added to cart` : ''}
+            </span>
 
             <button
               onClick={handleWishlist}

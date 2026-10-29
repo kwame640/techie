@@ -5,12 +5,12 @@ import { ShopProvider } from './context/ShopContext';
 import { NotificationProvider } from './context/NotificationContext';
 
 // Customer Pages
-import { BusinessDiscovery } from './pages/customer/BusinessDiscovery';
 import { StorePage } from './pages/customer/StorePage';
 import { ProductPage } from './pages/customer/ProductPage';
 import { CustomerCart } from './pages/customer/CustomerCart';
 import { CustomerCheckout } from './pages/customer/CustomerCheckout';
 import { CustomerOrders } from './pages/customer/CustomerOrders';
+import { OrderConfirmation } from './pages/customer/OrderConfirmation';
 import { CustomerProfile } from './pages/customer/CustomerProfile';
 import { MarketplaceHome } from './pages/customer/MarketplaceHome';
 import { ProductSearch } from './pages/customer/ProductSearch';
@@ -161,7 +161,6 @@ function App() {
           <Route path="/" element={<MarketplaceHome />} />
           <Route path="/search" element={<ProductSearch />} />
           <Route path="/launch" element={<LaunchCountdownPage />} />
-           <Route path="/discover" element={<BusinessDiscovery />} />
            <Route
              path="/store/biz-4"
              element={
@@ -172,26 +171,13 @@ function App() {
            />
            <Route path="/store/:storeId" element={<StorePage />} />
            <Route path="/product/:productId" element={<ProductPage />} />
-          <Route 
-            path="/customer/cart" 
-            element={
-              <ProtectedRoute allowedRoles={['customer']}>
-                <CustomerCart />
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/customer/cart" element={<CustomerCart />} />
           <Route 
             path="/customer/checkout" 
             element={<CustomerCheckout />} 
           />
-          <Route 
-            path="/customer/orders" 
-            element={
-              <ProtectedRoute allowedRoles={['customer']}>
-                <CustomerOrders />
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/customer/orders" element={<CustomerOrders />} />
+          <Route path="/order/:orderId" element={<OrderConfirmation />} />
           <Route 
             path="/customer/profile" 
             element={

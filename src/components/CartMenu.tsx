@@ -2,13 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Check, X, ShoppingBag } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
-import { useAuth } from '../context/AuthContext';
 import { formatGhc } from '../lib/utils';
 
 export const CartMenu: React.FC = () => {
   const { lastAdded, cartTotal, cartCount } = useShop();
-  const { user } = useAuth();
-  const { requestCheckout } = useShop();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -39,11 +36,7 @@ export const CartMenu: React.FC = () => {
 
   const goToCheckout = () => {
     close();
-    if (user) {
-      navigate('/customer/checkout');
-    } else {
-      requestCheckout('/customer/checkout');
-    }
+    navigate('/customer/checkout');
   };
 
   return (
@@ -51,21 +44,21 @@ export const CartMenu: React.FC = () => {
       <div
         aria-hidden
         onClick={close}
-        className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px] transition-opacity duration-200 ${
+        className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px] transition-opacity duration-200 animate-cart-backdrop ${
           closing ? 'opacity-0' : 'opacity-100'
         }`}
       />
       <div
         role="dialog"
         aria-label="Added to cart"
-        className={`fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-[380px] max-h-[85vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-accent-tan/40 transition-all duration-200 ${
+        className={`fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-[380px] max-h-[85vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-accent-tan/40 transition-all duration-200 animate-cart-drawer ${
           closing ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
         }`}
       >
         <div className="flex items-center justify-between px-5 py-4 bg-primary text-white">
           <div className="flex items-center gap-2.5">
-            <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
-              <Check className="w-4 h-4" />
+            <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center animate-cart-bounce">
+              <Check className="w-4 h-4 animate-check-pop" />
             </span>
             <span className="font-semibold">Added to Cart</span>
           </div>
@@ -80,7 +73,7 @@ export const CartMenu: React.FC = () => {
 
         <div className="p-5 space-y-4">
           <div className="flex gap-3">
-            <div className="w-16 h-16 rounded-xl overflow-hidden bg-accent-beige flex-shrink-0">
+            <div className="w-16 h-16 rounded-xl overflow-hidden bg-accent-beige flex-shrink-0 animate-added-item">
               {item.product.image ? (
                 <img
                   src={item.product.image}

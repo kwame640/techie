@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="NKAY store cover placeholder">
+  <defs>
+    <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6f3d27"/>
+      <stop offset="0.55" stop-color="#8a563c"/>
+      <stop offset="1" stop-color="#c9a48f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="400" fill="url(#cover)"/>
+  <circle cx="1010" cy="70" r="180" fill="#ffffff" opacity="0.06"/>
+  <circle cx="180" cy="360" r="220" fill="#ffffff" opacity="0.05"/>
+  <text x="600" y="212" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="800" letter-spacing="18" fill="#ffffff" opacity="0.9">NKAY</text>
+  <text x="600" y="258" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="18" letter-spacing="6" fill="#ffffff" opacity="0.7">SHOP · SELL · GROW</text>
+</svg>

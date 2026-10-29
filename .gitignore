@@ -3,6 +3,7 @@ dist
 .env
 .vercel
 .env*
+!.env.example
 package-lock.json
 *.timestamp-*.mjs
 .kilo/
@@ -13,3 +14,10 @@ package-lock.json
 .env*
 
 otp-test*
+
+# Local order + stock data (runtime state, not source)
+server/models/data/orders.json
+server/models/data/stock.json
+
+# Keep the environment template tracked
+!.env.example

@@ -14,6 +14,7 @@ interface ShopContextType {
   checkoutEmail: string;
   addToCart: (product: Product, quantity?: number, color?: string, size?: string) => void;
   removeFromCart: (productId: string) => void;
+  clearCart: () => void;
   updateQuantity: (productId: string, quantity: number) => void;
   requestCheckout: (path: string) => void;
   clearPendingCheckout: () => void;
@@ -27,22 +28,26 @@ interface ShopContextType {
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
+const readStoredList = <T,>(key: string): T[] => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+};
+
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [wishlist, setWishlist] = useState<Product[]>([]);
+  // Read persisted data in the lazy initialiser. A separate load effect would
+  // race the save effect and overwrite the stored cart with the empty state.
+  const [cart, setCart] = useState<CartItem[]>(() => readStoredList<CartItem>('cart'));
+  const [wishlist, setWishlist] = useState<Product[]>(() => readStoredList<Product>('wishlist'));
   const [lastAdded, setLastAdded] = useState<LastAddedItem | null>(null);
   const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
   const [checkoutEmail, setCheckoutEmail] = useState('');
-  
-  // Load from localStorage
-  useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
-    const savedWishlist = localStorage.getItem('wishlist');
-    
-    if (savedCart) setCart(JSON.parse(savedCart));
-    if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
-  }, []);
-  
+
   // Save to localStorage
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(cart));
@@ -74,6 +79,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const removeFromCart = (productId: string) => {
     setCart(prev => prev.filter(item => item.product.id !== productId));
   };
+
+  const clearCart = () => setCart([]);
   
   const updateQuantity = (productId: string, quantity: number) => {
     if (quantity <= 0) {
@@ -115,6 +122,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         checkoutEmail,
         addToCart,
         removeFromCart,
+        clearCart,
         updateQuantity,
         requestCheckout,
         clearPendingCheckout,

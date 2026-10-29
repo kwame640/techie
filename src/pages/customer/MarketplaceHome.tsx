@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
   Search, Truck, Store, X as XIcon,
-  ArrowRight, Heart, Home, Grid3x3, Building2,
+  ArrowRight, Home, Grid3x3,
   ShoppingCart, Package, ShoppingBag, Menu,
   CreditCard, Facebook, Instagram, Twitter, Linkedin, Globe,
-  User, Bell,
+  User, Phone,
 } from 'lucide-react';
 import { sampleBusinesses, businessCategories, sampleProducts } from '../../data/marketplaceData';
 import { products as shopProducts } from '../../data/products';
@@ -17,8 +17,6 @@ import { useShop } from '../../context/ShopContext';
 
 const sidebarNav = [
   { name: 'Home', href: '/', icon: Home, active: true },
-  { name: 'Categories', href: '/discover', icon: Grid3x3 },
-  { name: 'Businesses', href: '/discover', icon: Building2 },
   { name: 'Orders', href: '/customer/orders', icon: Package },
 ];
 
@@ -32,15 +30,14 @@ const categoryIcons: Record<string, JSX.Element> = {
   'Home & Kitchen': <ShoppingBag className="w-5 h-5" />,
   'Phones & Accessories': <ShoppingCart className="w-5 h-5" />,
   Automotive: <Store className="w-5 h-5" />,
-  'More Categories': <Grid3x3 className="w-5 h-5" />,
 };
 
 const footerLinks = {
   shop: [
-    { name: 'All Products', href: '/discover' },
-    { name: 'New Arrivals', href: '/discover' },
-    { name: 'Categories', href: '/discover' },
-    { name: 'Popular Searches', href: '/discover' },
+    { name: 'All Products', href: '/search' },
+    { name: 'New Arrivals', href: '/search' },
+    { name: 'Categories', href: '/' },
+    { name: 'Popular Searches', href: '/search' },
   ],
   customerService: [
     { name: 'Help Center', href: '#' },
@@ -219,7 +216,7 @@ export const MarketplaceHome = () => {
     title,
     subtitle,
     accent = 'Featured',
-    viewHref = '/discover',
+    viewHref = '/search',
     viewLabel = 'View All',
   }: {
     title: string;
@@ -281,15 +278,15 @@ export const MarketplaceHome = () => {
             <Truck className="w-3.5 h-3.5 text-accent-tan" />
             Ghana's premium marketplace connecting customers with the best local businesses
           </p>
-          <div className="flex items-center gap-5">
-            <span className="font-semibold text-accent-beige/90 tracking-wide">SHOP • SELL • GROW</span>
-            <Link
-              to="/business/register"
-              className="inline-flex items-center gap-1.5 font-semibold text-white hover:text-accent-beige transition-colors"
-            >
-              <Store className="w-3.5 h-3.5" />
-              Register Your Business
-            </Link>
+          <div className="flex items-center gap-2.5">
+            <a href="tel:+233257463603" className="flex items-center gap-1.5 font-medium text-accent-beige/90 hover:text-white transition-colors">
+              <Phone className="w-3.5 h-3.5 text-accent-tan" />
+              0257 463 603
+            </a>
+            <span className="text-gray-600">·</span>
+            <a href="mailto:godfreda938@gmail.com" className="hover:text-white transition-colors">
+              godfreda938@gmail.com
+            </a>
           </div>
         </div>
       </div>
@@ -303,7 +300,7 @@ export const MarketplaceHome = () => {
               <img src={logoImage} alt="NKAY" className="h-9 w-auto flex-shrink-0" />
               <div className="flex items-center min-w-0">
                 <span className="text-xl font-bold text-primary">NKAY</span>
-                <span className="text-[10px] text-text-light ml-1.5">SHOP • SELL • GROW</span>
+                <span className="text-[10px] text-text-light ml-1.5 whitespace-nowrap">0257 463 603</span>
               </div>
             </Link>
             <div className="flex items-center gap-1">
@@ -338,7 +335,7 @@ export const MarketplaceHome = () => {
               <img src={logoImage} alt="NKAY" className="h-10 w-auto" />
               <div className="flex items-center">
                 <span className="text-2xl font-bold text-primary">NKAY</span>
-                <span className="text-xs text-text-light ml-2 hidden xl:inline">SHOP • SELL • GROW</span>
+                <span className="text-xs text-text-light ml-2 hidden xl:inline whitespace-nowrap">0257 463 603</span>
               </div>
             </Link>
 
@@ -362,14 +359,6 @@ export const MarketplaceHome = () => {
                 <span className="text-[10px] font-semibold text-text-light leading-none">Orders</span>
               </Link>
               <Link
-                to="/customer/orders"
-                aria-label="Notifications"
-                className="flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl hover:bg-accent-beige transition-colors"
-              >
-                <Bell className="w-5 h-5 text-text-light" />
-                <span className="text-[10px] font-semibold text-text-light leading-none">Alerts</span>
-              </Link>
-              <Link
                 to="/customer/cart"
                 aria-label="Cart"
                 className="relative flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl hover:bg-accent-beige transition-colors"
@@ -383,13 +372,6 @@ export const MarketplaceHome = () => {
                   )}
                 </span>
                 <span className="text-[10px] font-semibold text-text-light leading-none">Cart</span>
-              </Link>
-              <Link
-                to="/business/register"
-                className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl text-xs font-medium hover:bg-primary/90 transition whitespace-nowrap ml-1"
-              >
-                <Store className="w-4 h-4" />
-                Sell on NKAY
               </Link>
             </div>
           </div>
@@ -427,13 +409,6 @@ export const MarketplaceHome = () => {
                   </button>
                 );
               })}
-              <Link
-                to="/discover"
-                className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-text-light hover:bg-accent-beige hover:text-primary border border-gray-200 transition-all"
-              >
-                <Grid3x3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                More Categories
-              </Link>
             </div>
           </div>
         </nav>
@@ -566,24 +541,6 @@ export const MarketplaceHome = () => {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {/* Hero */}
-        <section className="mb-5 sm:mb-7">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-1 h-6 bg-primary rounded-full"></div>
-            <span className="text-sm font-medium text-primary">Your Area</span>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-text mb-1 sm:mb-2 leading-tight">
-                Businesses Near You
-              </h1>
-              <p className="text-xs sm:text-sm text-text-light">
-                Discover amazing businesses, products and services in your area.
-              </p>
-            </div>
-          </div>
-        </section>
-
         {/* Featured Businesses Carousel */}
         <div className="mb-6 sm:mb-8">
           <HomepageCarousel />
@@ -675,43 +632,6 @@ export const MarketplaceHome = () => {
           </div>
         </section>
 
-        {/* Explore More */}
-        <section className="mb-8 sm:mb-12">
-          <Link
-            to="/discover"
-            className="relative block overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary-light to-accent-tan shadow-soft hover:shadow-card transition-shadow duration-300"
-          >
-            <svg
-              className="absolute inset-0 w-full h-full opacity-[0.08] pointer-events-none"
-              viewBox="0 0 400 120"
-              preserveAspectRatio="none"
-            >
-              <path d="M0,40 L80,20 L160,35 L240,15 L320,30 L400,10 V120 H0 Z" fill="currentColor" />
-              <path d="M0,55 L80,35 L160,50 L240,30 L320,45 L400,25 V120 H0 Z" fill="currentColor" />
-              <path d="M0,70 L80,50 L160,65 L240,45 L320,60 L400,40 V120 H0 Z" fill="currentColor" />
-            </svg>
-            <div className="relative px-6 sm:px-8 py-6 sm:py-8 flex flex-wrap items-center justify-between gap-4 text-white">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-accent-beige/90">Explore More</p>
-                <h2 className="text-xl sm:text-2xl font-bold mb-1">Discover Every Store & Product on NKAY</h2>
-                <p className="text-sm text-white/80">Browse the full marketplace — thousands of products from local businesses across Ghana.</p>
-              </div>
-              <span className="inline-flex items-center gap-2 bg-white/95 text-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-white transition-colors whitespace-nowrap flex-shrink-0">
-                Explore All
-                <ArrowRight className="w-4 h-4" />
-              </span>
-            </div>
-          </Link>
-        </section>
-
-        {/* Support Local Businesses */}
-        <section className="mb-6 sm:mb-8">
-          <div className="bg-white rounded-2xl shadow-card px-5 sm:px-6 py-4 sm:py-5 flex flex-wrap items-center gap-3 sm:gap-4">
-            <Heart className="w-5 h-5 text-primary flex-shrink-0" />
-            <p className="text-sm font-semibold text-text">Support Local Businesses</p>
-            <p className="text-xs text-text-light">Every purchase supports Ghanaian entrepreneurs</p>
-          </div>
-        </section>
       </main>
 
       {/* Footer */}
@@ -821,13 +741,13 @@ export const MarketplaceHome = () => {
             Home
           </NavLink>
           <NavLink
-            to="/discover"
+            to="/search"
             className={({ isActive }) =>
               `flex flex-col items-center gap-1 py-2.5 text-[10px] sm:text-[11px] font-semibold transition-colors ${isActive ? 'text-primary' : 'text-text-light hover:text-primary'}`
             }
           >
-            <Grid3x3 className="w-5 h-5" />
-            Categories
+            <Search className="w-5 h-5" />
+            Search
           </NavLink>
           <NavLink
             to="/customer/orders"

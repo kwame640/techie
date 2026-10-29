@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, Clock, CheckCircle, XCircle, LogOut, Eye, ChevronLeft, ChevronRight, X, Trash2, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
 import logoImage from '../../images/nkay.png';
 import { safeFetchJson } from '../../lib/fetch';
+import { AdminOrders } from './AdminOrders';
 
 interface BusinessImage {
   id: string;
@@ -51,6 +52,7 @@ export const AdminDashboard = () => {
   const [uploadError, setUploadError] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'Approved' | 'Pending' | 'Rejected' | 'Suspended' | 'All'>('All');
+  const [view, setView] = useState<'vendors' | 'payments'>('vendors');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -327,6 +329,29 @@ export const AdminDashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => setView('vendors')}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              view === 'vendors' ? 'bg-primary text-white' : 'bg-white text-text-light hover:bg-gray-50'
+            }`}
+          >
+            <Building2 className="w-4 h-4" /> Vendors
+          </button>
+          <button
+            onClick={() => setView('payments')}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              view === 'payments' ? 'bg-primary text-white' : 'bg-white text-text-light hover:bg-gray-50'
+            }`}
+          >
+            <CheckCircle className="w-4 h-4" /> Orders &amp; payments
+          </button>
+        </div>
+
+        {view === 'payments' ? (
+          <AdminOrders />
+        ) : (
+          <>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-card">
             <div className="flex items-center gap-3">
@@ -461,6 +486,8 @@ export const AdminDashboard = () => {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
 
       {selectedRegistration && (

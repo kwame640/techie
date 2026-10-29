@@ -7,6 +7,21 @@ import { sendOtpEmail } from './services/emailService.js';
 import { registerBusiness } from './controllers/businessController.js';
 import { getRegistrations, getRegistration, updateStatus, getStats, adminLogin, deleteImage, uploadImage, getPublicRegistrations, getPublicRegistration } from './controllers/adminController.js';
 import { subscribe, unsubscribe, sendNotification, sendTestNotification } from './controllers/pushController.js';
+import {
+  quoteOrder,
+  createOrder,
+  getOrder,
+  listCustomerOrders,
+  getPaymentSettings,
+  getAdminPaymentSettings,
+  initiateOrderPayment,
+  verifyOrderPayment,
+  recheckOrderPayment,
+  handleHubtelCallback,
+  reconcilePendingPayments,
+  listAllOrders,
+} from './controllers/orderController.js';
+import { isHubtelConfigured, getHubtelConfig } from './services/hubtelService.js';
 import { authenticateAdmin } from './middleware/auth.js';
 import { authenticateVendor, requireVendorOwnership } from './middleware/vendorAuth.js';
 import { createVendorToken, verifyVendorToken } from './services/vendorSession.js';
@@ -427,9 +442,40 @@ app.post('/api/otp/verify', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Orders & Hubtel mobile money payments
+// Prices and stock are resolved from the server-side catalogue; amounts sent
+// by the browser are never trusted. The customer picks a wallet, Hubtel sends
+// a prompt to their phone, and the server verifies the result with Hubtel
+// before marking the order paid and decrementing stock.
+// ---------------------------------------------------------------------------
+app.post('/api/orders/quote', quoteOrder);
+app.post('/api/orders', createOrder);
+app.get('/api/orders', listCustomerOrders);
+app.get('/api/orders/:id', getOrder);
+app.post('/api/orders/:id/pay', initiateOrderPayment);
+app.post('/api/orders/:id/payment/verify', verifyOrderPayment);
+
+app.get('/api/payments/settings', getPaymentSettings);
+app.post('/api/payments/hubtel/callback', handleHubtelCallback);
+
+app.get('/api/admin/orders', authenticateAdmin, listAllOrders);
+app.post('/api/admin/orders/:id/payment/verify', authenticateAdmin, recheckOrderPayment);
+app.get('/api/admin/payment-settings', authenticateAdmin, getAdminPaymentSettings);
+
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
+  const config = getHubtelConfig();
+  res.json({
+    status: 'ok',
+    message: 'Server is running',
+    payments: {
+      method: 'hubtel',
+      configured: isHubtelConfigured(),
+      callbackConfigured: Boolean(config.callbackUrl),
+      missing: config.configured ? [] : config.missing,
+    },
+  });
 });
 
 // 404 catch-all: always return JSON (never HTML)
@@ -468,5 +514,22 @@ const isDirectEntry = process.argv[1] && (process.argv[1] === fileURLToPath(impo
 if (isDirectEntry) {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    if (isHubtelConfigured()) {
+      console.log('Hubtel payments: configured');
+    } else {
+      console.warn(`Hubtel payments: NOT configured (missing ${getHubtelConfig().missing.join(', ')})`);
+    }
   });
+
+  // Safety net for missed callbacks: re-check live payments with Hubtel.
+  // Timers do not run under Vercel serverless, so this only starts for the
+  // standalone server. Serverless deployments still verify on page poll and
+  // whenever an admin re-checks an order.
+  const RECONCILE_INTERVAL_MS = 60 * 1000;
+  const reconcileTimer = setInterval(() => {
+    reconcilePendingPayments().catch((error) => {
+      console.error('Payment reconciliation error:', error.message);
+    });
+  }, RECONCILE_INTERVAL_MS);
+  if (typeof reconcileTimer.unref === 'function') reconcileTimer.unref();
 }

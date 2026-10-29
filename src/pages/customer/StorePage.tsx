@@ -6,7 +6,6 @@ import {
   ArrowLeft, Package, AlertCircle,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
-import { useAuth } from '../../context/AuthContext';
 import { safeFetchJson } from '../../lib/fetch';
 import { sampleBusinesses, sampleProducts } from '../../data/marketplaceData';
 import { Business, Product as MarketplaceProduct } from '../../types/marketplace';
@@ -15,24 +14,28 @@ import logoImage from '../../images/nkay.png';
 
 type SortOption = 'price-low' | 'price-high' | 'newest' | 'popularity';
 
-const toShopProduct = (p: MarketplaceProduct): ShopProduct => ({
-  id: p.id,
-  name: p.name,
-  description: p.description,
-  price: p.price,
-  originalPrice: p.discountPrice,
-  image: p.images?.[0] || '/api/placeholder/400/400',
-  images: p.images,
-  category: p.category,
-  rating: p.rating,
-  reviews: p.reviewCount,
-  colors: [],
-  sizes: [],
-  inStock: p.stock > 0,
-  isNew: p.createdAt && new Date(p.createdAt) > new Date('2024-07-01'),
-  isBestSeller: p.salesCount > 100,
-  discount: p.discountPrice ? Math.round(((p.price - p.discountPrice) / p.price) * 100) : undefined,
-});
+const toShopProduct = (p: MarketplaceProduct): ShopProduct => {
+  const hasDiscount = Boolean(p.discountPrice && p.discountPrice < p.price);
+  const sellingPrice = hasDiscount && p.discountPrice ? p.discountPrice : p.price;
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: sellingPrice,
+    originalPrice: hasDiscount ? p.price : undefined,
+    image: p.images?.[0] || '/products/placeholder.svg',
+    images: p.images,
+    category: p.category,
+    rating: p.rating,
+    reviews: p.reviewCount,
+    colors: [],
+    sizes: [],
+    inStock: p.stock > 0,
+    isNew: p.createdAt && new Date(p.createdAt) > new Date('2024-07-01'),
+    isBestSeller: p.salesCount > 100,
+    discount: hasDiscount ? Math.round(((p.price - sellingPrice) / p.price) * 100) : undefined,
+  };
+};
 
 const storeNav = [
   { name: 'Home', href: '#home', active: true },
@@ -45,8 +48,7 @@ const storeNav = [
 export const StorePage = () => {
   const { storeId } = useParams<{ storeId: string }>();
   const navigate = useNavigate();
-  const { addToCart, requestCheckout } = useShop();
-  const { user } = useAuth();
+  const { addToCart } = useShop();
   const [business, setBusiness] = useState<Business | null>(null);
   const [searched, setSearched] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -78,8 +80,8 @@ export const StorePage = () => {
               ownerId: reg.id,
               name: reg.businessName || '',
               description: reg.description || '',
-              logo: reg.storeLogo || '/api/placeholder/100/100',
-              coverImage: reg.storeBanner || '/api/placeholder/1200/400',
+              logo: reg.storeLogo || '/images/nkay.png',
+              coverImage: reg.storeBanner || '/products/store-cover.svg',
               category: (reg.businessCategory || 'Other') as Business['category'],
               city: reg.city || '',
               region: reg.region || '',
@@ -164,12 +166,7 @@ export const StorePage = () => {
   };
 
   const handleBuyNow = (product: ShopProduct) => {
-    addToCart(product);
-    if (user) {
-      navigate('/customer/checkout');
-    } else {
-      requestCheckout('/customer/checkout');
-    }
+    navigate(`/customer/checkout?productId=${encodeURIComponent(product.id)}&qty=1`);
   };
 
   if (!searched) {
@@ -419,8 +416,10 @@ export const StorePage = () => {
               }>
                 {filtered.map((product) => {
                   const shopProduct = toShopProduct(product);
-                  const discount = product.discountPrice
-                    ? Math.round(((product.price - product.discountPrice) / product.price) * 100)
+                  const hasDiscount = Boolean(product.discountPrice && product.discountPrice < product.price);
+                  const sellingPrice = hasDiscount && product.discountPrice ? product.discountPrice : product.price;
+                  const discount = hasDiscount
+                    ? Math.round(((product.price - sellingPrice) / product.price) * 100)
                     : 0;
 
                   return (
@@ -456,8 +455,8 @@ export const StorePage = () => {
                         </div>
 
                         <div className="flex items-center gap-2 mb-4">
-                          <span className="font-bold text-lg text-primary">GH₵{product.discountPrice || product.price}</span>
-                          {product.discountPrice && (
+                          <span className="font-bold text-lg text-primary">GH₵{sellingPrice.toLocaleString()}</span>
+                          {hasDiscount && (
                             <>
                               <span className="text-sm text-text-light line-through">GH₵{product.price}</span>
                               <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">

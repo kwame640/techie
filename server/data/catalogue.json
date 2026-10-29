@@ -1,0 +1,788 @@
+{
+  "generatedAt": "2026-10-28T21:02:49.029Z",
+  "currency": "GHS",
+  "delivery": {
+    "homePesewas": 3000,
+    "pickupPesewas": 0
+  },
+  "businesses": {
+    "biz-1": {
+      "id": "biz-1",
+      "name": "Kofi Electronics",
+      "phone": "+233 24 123 4567",
+      "email": "kofi@electronics.com",
+      "city": "Accra",
+      "region": "Greater Accra",
+      "pickupLocation": "Shop 23, Osu Oxford Street"
+    },
+    "biz-2": {
+      "id": "biz-2",
+      "name": "Ama Fashion Hub",
+      "phone": "+233 20 234 5678",
+      "email": "ama@fashionhub.com",
+      "city": "Accra",
+      "region": "Greater Accra",
+      "pickupLocation": "Shop 5, Labadi Beach Road"
+    },
+    "biz-3": {
+      "id": "biz-3",
+      "name": "Fresh Groceries Market",
+      "phone": "+233 50 345 6789",
+      "email": "fresh@groceries.com",
+      "city": "Kumasi",
+      "region": "Ashanti",
+      "pickupLocation": "Market Square, Adum"
+    },
+    "biz-4": {
+      "id": "biz-4",
+      "name": "Tech Haven Ghana",
+      "phone": "+233 55 456 7890",
+      "email": "tech@haven.com",
+      "city": "Accra",
+      "region": "Greater Accra",
+      "pickupLocation": "Spintex Road, near Accra Mall"
+    },
+    "biz-5": {
+      "id": "biz-5",
+      "name": "Beauty Glow Spa",
+      "phone": "+233 24 567 8901",
+      "email": "beauty@glowspa.com",
+      "city": "Accra",
+      "region": "Greater Accra",
+      "pickupLocation": "Airport Residential Area"
+    },
+    "biz-6": {
+      "id": "biz-6",
+      "name": "Adom Home Essentials",
+      "phone": "+233 20 456 7890",
+      "email": "hello@adomhome.com",
+      "city": "Accra",
+      "region": "Greater Accra",
+      "pickupLocation": "Madina Market, Shop 14"
+    },
+    "nkay-shop": {
+      "id": "nkay-shop",
+      "name": "NKAY Shop",
+      "phone": "0552951226",
+      "email": "support@nkay.com",
+      "city": "Accra",
+      "region": "Greater Accra",
+      "pickupLocation": "Accra, Ghana"
+    }
+  },
+  "products": [
+    {
+      "id": "prod-1",
+      "businessId": "biz-1",
+      "businessName": "Kofi Electronics",
+      "name": "Samsung Galaxy A54 5G",
+      "description": "6.4-inch display, 128GB storage, 50MP camera, long-lasting battery",
+      "category": "Phones & Accessories",
+      "image": "/products/placeholder.svg",
+      "images": [
+        "/products/placeholder.svg"
+      ],
+      "sku": "SG-A54-128",
+      "pricePesewas": 250000,
+      "originalPricePesewas": 280000,
+      "stock": 15,
+      "status": "active"
+    },
+    {
+      "id": "prod-2",
+      "businessId": "biz-1",
+      "businessName": "Kofi Electronics",
+      "name": "HP 15.6\" Laptop Intel Core i5",
+      "description": "8GB RAM, 512GB SSD, Windows 11, perfect for work and study",
+      "category": "Computer & Technology",
+      "image": "/products/placeholder.svg",
+      "images": [
+        "/products/placeholder.svg"
+      ],
+      "sku": "HP-15-I5",
+      "pricePesewas": 550000,
+      "originalPricePesewas": null,
+      "stock": 8,
+      "status": "active"
+    },
+    {
+      "id": "prod-3",
+      "businessId": "biz-2",
+      "businessName": "Ama Fashion Hub",
+      "name": "African Print Maxi Dress",
+      "description": "Beautiful handcrafted African print dress, available in multiple sizes",
+      "category": "Fashion",
+      "image": "/products/placeholder.svg",
+      "images": [
+        "/products/placeholder.svg"
+      ],
+      "sku": "AF-MAXI-001",
+      "pricePesewas": 28000,
+      "originalPricePesewas": 35000,
+      "stock": 25,
+      "status": "active"
+    },
+    {
+      "id": "prod-4",
+      "businessId": "biz-2",
+      "businessName": "Ama Fashion Hub",
+      "name": "Men's Traditional Kente Shirt",
+      "description": "Authentic Ghanaian Kente fabric, modern fit, perfect for occasions",
+      "category": "Fashion",
+      "image": "/products/placeholder.svg",
+      "images": [
+        "/products/placeholder.svg"
+      ],
+      "sku": "KT-MEN-001",
+      "pricePesewas": 45000,
+      "originalPricePesewas": null,
+      "stock": 18,
+      "status": "active"
+    },
+    {
+      "id": "prod-5",
+      "businessId": "biz-3",
+      "businessName": "Fresh Groceries Market",
+      "name": "Fresh Plantains (1 bunch)",
+      "description": "Ripe plantains, perfect for frying or boiling",
+      "category": "Groceries",
+      "image": "/products/placeholder.svg",
+      "images": [
+        "/products/placeholder.svg"
+      ],
+      "sku": "PL-001",
+      "pricePesewas": 2500,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "prod-6",
+      "businessId": "biz-3",
+      "businessName": "Fresh Groceries Market",
+      "name": "Organic Tomatoes (1kg)",
+      "description": "Fresh organic tomatoes from local farms",
+      "category": "Groceries",
+      "image": "/products/placeholder.svg",
+      "images": [
+        "/products/placeholder.svg"
+      ],
+      "sku": "TM-ORG-001",
+      "pricePesewas": 1500,
+      "originalPricePesewas": null,
+      "stock": 100,
+      "status": "active"
+    },
+    {
+      "id": "prod-7",
+      "businessId": "biz-4",
+      "businessName": "Tech Haven Ghana",
+      "name": "Wireless Bluetooth Earbuds",
+      "description": "Premium sound quality, noise cancellation, 24hr battery life",
+      "category": "Electronics",
+      "image": "/products/placeholder.svg",
+      "images": [
+        "/products/placeholder.svg"
+      ],
+      "sku": "WB-EAR-001",
+      "pricePesewas": 28000,
+      "originalPricePesewas": 35000,
+      "stock": 30,
+      "status": "active"
+    },
+    {
+      "id": "prod-8",
+      "businessId": "biz-5",
+      "businessName": "Beauty Glow Spa",
+      "name": "Vitamin C Serum",
+      "description": "Brightening serum, reduces dark spots, 30ml",
+      "category": "Beauty",
+      "image": "/products/placeholder.svg",
+      "images": [
+        "/products/placeholder.svg"
+      ],
+      "sku": "VC-SER-030",
+      "pricePesewas": 18000,
+      "originalPricePesewas": null,
+      "stock": 40,
+      "status": "active"
+    },
+    {
+      "id": "prod-9",
+      "businessId": "biz-2",
+      "businessName": "Ama Fashion Hub",
+      "name": "Polka Dot Halter Neck Mini Dress",
+      "description": "Flirty backless mini dress with a halter neckline and polka dot print. Stretchy, lightweight fabric with a fitted silhouette — ideal for parties and summer evenings.",
+      "category": "Fashion",
+      "image": "/products/aliexpress/womens-polka-dot-halter-mini-dress.webp",
+      "images": [
+        "/products/aliexpress/womens-polka-dot-halter-mini-dress.webp",
+        "/products/aliexpress/womens-polka-dot-halter-mini-dress-2.webp",
+        "/products/aliexpress/womens-polka-dot-halter-mini-dress-3.webp",
+        "/products/aliexpress/womens-polka-dot-halter-mini-dress-4.webp"
+      ],
+      "sku": "AE-WF-001",
+      "pricePesewas": 8742,
+      "originalPricePesewas": 29140,
+      "stock": 32,
+      "status": "active"
+    },
+    {
+      "id": "prod-10",
+      "businessId": "biz-2",
+      "businessName": "Ama Fashion Hub",
+      "name": "Loose Fit T-Shirt Midi Dress",
+      "description": "Relaxed short-sleeve midi dress in soft cotton-blend jersey. Easy everyday wear that falls just over the knee, with a round neck and side pockets.",
+      "category": "Fashion",
+      "image": "/products/aliexpress/womens-loose-tshirt-midi-dress.webp",
+      "images": [
+        "/products/aliexpress/womens-loose-tshirt-midi-dress.webp",
+        "/products/aliexpress/womens-loose-tshirt-midi-dress-2.webp",
+        "/products/aliexpress/womens-loose-tshirt-midi-dress-3.webp",
+        "/products/aliexpress/womens-loose-tshirt-midi-dress-4.webp"
+      ],
+      "sku": "AE-WF-002",
+      "pricePesewas": 10051,
+      "originalPricePesewas": 31409,
+      "stock": 40,
+      "status": "active"
+    },
+    {
+      "id": "prod-11",
+      "businessId": "biz-2",
+      "businessName": "Ama Fashion Hub",
+      "name": "Halter Lace-Up Bodycon Mini Dress",
+      "description": "Elegant sleeveless bodycon dress with a lace-up back and halter neck. Smooth stretch fabric that holds its shape — a party and date-night favourite.",
+      "category": "Fashion",
+      "image": "/products/aliexpress/womens-halter-lace-up-bodycon-dress.webp",
+      "images": [
+        "/products/aliexpress/womens-halter-lace-up-bodycon-dress.webp",
+        "/products/aliexpress/womens-halter-lace-up-bodycon-dress-2.webp",
+        "/products/aliexpress/womens-halter-lace-up-bodycon-dress-3.webp",
+        "/products/aliexpress/womens-halter-lace-up-bodycon-dress-4.webp"
+      ],
+      "sku": "AE-WF-003",
+      "pricePesewas": 12709,
+      "originalPricePesewas": 36311,
+      "stock": 25,
+      "status": "active"
+    },
+    {
+      "id": "prod-12",
+      "businessId": "biz-2",
+      "businessName": "Ama Fashion Hub",
+      "name": "Chiffon Pleated A-Line Midi Dress",
+      "description": "Flowy A-line midi dress in lightweight chiffon with an elastic waist and soft pleats. Breathable and easy to dress up or down.",
+      "category": "Fashion",
+      "image": "/products/aliexpress/womens-chiffon-pleated-midi-dress.webp",
+      "images": [
+        "/products/aliexpress/womens-chiffon-pleated-midi-dress.webp",
+        "/products/aliexpress/womens-chiffon-pleated-midi-dress-2.webp",
+        "/products/aliexpress/womens-chiffon-pleated-midi-dress-3.webp",
+        "/products/aliexpress/womens-chiffon-pleated-midi-dress-4.webp"
+      ],
+      "sku": "AE-WF-004",
+      "pricePesewas": 7068,
+      "originalPricePesewas": 26178,
+      "stock": 48,
+      "status": "active"
+    },
+    {
+      "id": "prod-13",
+      "businessId": "biz-2",
+      "businessName": "Ama Fashion Hub",
+      "name": "Vintage V-Neck Midi Dress",
+      "description": "Retro-inspired midi dress with a V-neck, fitted bodice and full skirt. Fully lined and wrinkle-resistant — suited to office days and events.",
+      "category": "Fashion",
+      "image": "/products/aliexpress/womens-vintage-vneck-midi-dress.webp",
+      "images": [
+        "/products/aliexpress/womens-vintage-vneck-midi-dress.webp",
+        "/products/aliexpress/womens-vintage-vneck-midi-dress-2.webp",
+        "/products/aliexpress/womens-vintage-vneck-midi-dress-3.webp",
+        "/products/aliexpress/womens-vintage-vneck-midi-dress-4.webp"
+      ],
+      "sku": "AE-WF-005",
+      "pricePesewas": 13838,
+      "originalPricePesewas": 38439,
+      "stock": 18,
+      "status": "active"
+    },
+    {
+      "id": "prod-14",
+      "businessId": "biz-2",
+      "businessName": "Ama Fashion Hub",
+      "name": "Rhinestone Crystal Evening Clutch",
+      "description": "Compact evening bag covered in sparkling rhinestones, with a detachable chain strap and secure clasp. Pairs with dresses for weddings and parties.",
+      "category": "Fashion",
+      "image": "/products/aliexpress/womens-rhinestone-evening-clutch.webp",
+      "images": [
+        "/products/aliexpress/womens-rhinestone-evening-clutch.webp",
+        "/products/aliexpress/womens-rhinestone-evening-clutch-2.webp",
+        "/products/aliexpress/womens-rhinestone-evening-clutch-3.webp",
+        "/products/aliexpress/womens-rhinestone-evening-clutch-4.webp"
+      ],
+      "sku": "AE-WF-006",
+      "pricePesewas": 15300,
+      "originalPricePesewas": 51000,
+      "stock": 12,
+      "status": "active"
+    },
+    {
+      "id": "prod-15",
+      "businessId": "biz-1",
+      "businessName": "Kofi Electronics",
+      "name": "Baseus Bass EP10 ANC Wireless Earbuds",
+      "description": "True wireless earbuds with -43dB active noise cancelling, Bluetooth 6.0 and up to 40 hours of playtime with the charging case. Fast USB-C charging.",
+      "category": "Phones & Accessories",
+      "image": "/products/aliexpress/baseus-bass-ep10-anc-earbuds.webp",
+      "images": [
+        "/products/aliexpress/baseus-bass-ep10-anc-earbuds.webp",
+        "/products/aliexpress/baseus-bass-ep10-anc-earbuds-2.webp",
+        "/products/aliexpress/baseus-bass-ep10-anc-earbuds-3.webp",
+        "/products/aliexpress/baseus-bass-ep10-anc-earbuds-4.webp"
+      ],
+      "sku": "AE-PA-001",
+      "pricePesewas": 22708,
+      "originalPricePesewas": 48315,
+      "stock": 26,
+      "status": "active"
+    },
+    {
+      "id": "prod-16",
+      "businessId": "biz-1",
+      "businessName": "Kofi Electronics",
+      "name": "Lenovo XT80 Sports Wireless Earbuds",
+      "description": "Ear-hook sports earbuds with Bluetooth 5.4, LED power display and sweat-resistant build. Secure fit for workouts and long calls.",
+      "category": "Phones & Accessories",
+      "image": "/products/aliexpress/lenovo-xt80-sports-earbuds.webp",
+      "images": [
+        "/products/aliexpress/lenovo-xt80-sports-earbuds.webp",
+        "/products/aliexpress/lenovo-xt80-sports-earbuds-2.webp",
+        "/products/aliexpress/lenovo-xt80-sports-earbuds-3.webp",
+        "/products/aliexpress/lenovo-xt80-sports-earbuds-4.webp"
+      ],
+      "sku": "AE-PA-002",
+      "pricePesewas": 12435,
+      "originalPricePesewas": 40113,
+      "stock": 35,
+      "status": "active"
+    },
+    {
+      "id": "prod-17",
+      "businessId": "biz-1",
+      "businessName": "Kofi Electronics",
+      "name": "240W 5-in-1 GaN Fast Charger",
+      "description": "Desktop GaN charging station with 2 USB-A and 3 USB-C ports, supporting up to 240W PD fast charging for phones, tablets and laptops. LED power indicator.",
+      "category": "Phones & Accessories",
+      "image": "/products/aliexpress/240w-5in1-gan-fast-charger.webp",
+      "images": [
+        "/products/aliexpress/240w-5in1-gan-fast-charger.webp",
+        "/products/aliexpress/240w-5in1-gan-fast-charger-2.webp",
+        "/products/aliexpress/240w-5in1-gan-fast-charger-3.webp",
+        "/products/aliexpress/240w-5in1-gan-fast-charger-4.webp"
+      ],
+      "sku": "AE-PA-003",
+      "pricePesewas": 8800,
+      "originalPricePesewas": 17255,
+      "stock": 60,
+      "status": "active"
+    },
+    {
+      "id": "prod-18",
+      "businessId": "biz-1",
+      "businessName": "Kofi Electronics",
+      "name": "Silicone Dashboard Car Phone Mount",
+      "description": "Anti-slip silicone phone holder for car dashboards with 360° rotation and a stable adhesive base. Fits most phones up to 6.7 inches.",
+      "category": "Phones & Accessories",
+      "image": "/products/aliexpress/silicone-dashboard-car-phone-mount.webp",
+      "images": [
+        "/products/aliexpress/silicone-dashboard-car-phone-mount.webp",
+        "/products/aliexpress/silicone-dashboard-car-phone-mount-2.webp",
+        "/products/aliexpress/silicone-dashboard-car-phone-mount-3.webp",
+        "/products/aliexpress/silicone-dashboard-car-phone-mount-4.webp"
+      ],
+      "sku": "AE-PA-004",
+      "pricePesewas": 9100,
+      "originalPricePesewas": 17843,
+      "stock": 44,
+      "status": "active"
+    },
+    {
+      "id": "prod-19",
+      "businessId": "biz-1",
+      "businessName": "Kofi Electronics",
+      "name": "Lychee Grain Shockproof iPhone Case",
+      "description": "Soft-touch lychee-grain silicone case with raised camera and screen edges for shock protection. Slim fit with a comfortable grip.",
+      "category": "Phones & Accessories",
+      "image": "/products/aliexpress/lychee-grain-iphone-case.webp",
+      "images": [
+        "/products/aliexpress/lychee-grain-iphone-case.webp",
+        "/products/aliexpress/lychee-grain-iphone-case-2.webp",
+        "/products/aliexpress/lychee-grain-iphone-case-3.webp",
+        "/products/aliexpress/lychee-grain-iphone-case-4.webp"
+      ],
+      "sku": "AE-PA-005",
+      "pricePesewas": 1700,
+      "originalPricePesewas": 2125,
+      "stock": 120,
+      "status": "active"
+    },
+    {
+      "id": "prod-20",
+      "businessId": "biz-1",
+      "businessName": "Kofi Electronics",
+      "name": "20000mAh Magnetic Wireless Power Bank",
+      "description": "High-capacity power bank with 22.5W PD wired charging and magnetic wireless charging for compatible phones. Charges a phone several times over.",
+      "category": "Phones & Accessories",
+      "image": "/products/aliexpress/20000mah-magnetic-power-bank.webp",
+      "images": [
+        "/products/aliexpress/20000mah-magnetic-power-bank.webp",
+        "/products/aliexpress/20000mah-magnetic-power-bank-2.webp",
+        "/products/aliexpress/20000mah-magnetic-power-bank-3.webp",
+        "/products/aliexpress/20000mah-magnetic-power-bank-4.webp"
+      ],
+      "sku": "AE-PA-006",
+      "pricePesewas": 22000,
+      "originalPricePesewas": 32836,
+      "stock": 14,
+      "status": "active"
+    },
+    {
+      "id": "prod-21",
+      "businessId": "biz-6",
+      "businessName": "Adom Home Essentials",
+      "name": "12-Piece Silicone Cooking Utensil Set",
+      "description": "Heat-resistant silicone utensil set with a matching holder. Includes spatula, ladle, slotted turner, tongs and spoons — safe for non-stick cookware.",
+      "category": "Home & Kitchen",
+      "image": "/products/aliexpress/12pc-silicone-cooking-utensil-set.webp",
+      "images": [
+        "/products/aliexpress/12pc-silicone-cooking-utensil-set.webp",
+        "/products/aliexpress/12pc-silicone-cooking-utensil-set-2.webp",
+        "/products/aliexpress/12pc-silicone-cooking-utensil-set-3.webp",
+        "/products/aliexpress/12pc-silicone-cooking-utensil-set-4.webp"
+      ],
+      "sku": "AE-HK-001",
+      "pricePesewas": 31328,
+      "originalPricePesewas": null,
+      "stock": 20,
+      "status": "active"
+    },
+    {
+      "id": "prod-22",
+      "businessId": "biz-6",
+      "businessName": "Adom Home Essentials",
+      "name": "5-Piece Wooden Kitchen Utensil Set",
+      "description": "Natural teak cooking spoons and spatulas with a smooth, non-scratch finish. Gentle on non-stick pans and comfortable to hold.",
+      "category": "Home & Kitchen",
+      "image": "/products/aliexpress/5pc-wooden-kitchen-utensil-set.webp",
+      "images": [
+        "/products/aliexpress/5pc-wooden-kitchen-utensil-set.webp",
+        "/products/aliexpress/5pc-wooden-kitchen-utensil-set-2.webp",
+        "/products/aliexpress/5pc-wooden-kitchen-utensil-set-3.webp",
+        "/products/aliexpress/5pc-wooden-kitchen-utensil-set-4.webp"
+      ],
+      "sku": "AE-HK-002",
+      "pricePesewas": 22600,
+      "originalPricePesewas": null,
+      "stock": 24,
+      "status": "active"
+    },
+    {
+      "id": "prod-23",
+      "businessId": "biz-6",
+      "businessName": "Adom Home Essentials",
+      "name": "9-Piece Stainless Steel Kitchen Utensil Set",
+      "description": "Durable stainless steel cooking tools including turner, slotted spoon, ladle and whisk. Dishwasher safe with hanging loops.",
+      "category": "Home & Kitchen",
+      "image": "/products/aliexpress/9pc-stainless-steel-utensil-set.webp",
+      "images": [
+        "/products/aliexpress/9pc-stainless-steel-utensil-set.webp",
+        "/products/aliexpress/9pc-stainless-steel-utensil-set-2.webp",
+        "/products/aliexpress/9pc-stainless-steel-utensil-set-3.webp",
+        "/products/aliexpress/9pc-stainless-steel-utensil-set-4.webp"
+      ],
+      "sku": "AE-HK-003",
+      "pricePesewas": 31722,
+      "originalPricePesewas": null,
+      "stock": 16,
+      "status": "active"
+    },
+    {
+      "id": "prod-24",
+      "businessId": "biz-6",
+      "businessName": "Adom Home Essentials",
+      "name": "Japanese Damascus Chef Knife Set",
+      "description": "Professional kitchen knife set with Damascus steel blades, including chef, cleaver, santoku, boning and utility knives. Sharp, balanced and rust resistant.",
+      "category": "Home & Kitchen",
+      "image": "/products/aliexpress/japanese-damascus-chef-knife-set.webp",
+      "images": [
+        "/products/aliexpress/japanese-damascus-chef-knife-set.webp",
+        "/products/aliexpress/japanese-damascus-chef-knife-set-2.webp",
+        "/products/aliexpress/japanese-damascus-chef-knife-set-3.webp",
+        "/products/aliexpress/japanese-damascus-chef-knife-set-4.webp"
+      ],
+      "sku": "AE-HK-004",
+      "pricePesewas": 13913,
+      "originalPricePesewas": null,
+      "stock": 22,
+      "status": "active"
+    },
+    {
+      "id": "prod-25",
+      "businessId": "biz-6",
+      "businessName": "Adom Home Essentials",
+      "name": "Ceramic Knife Set with Peeler",
+      "description": "Zirconia ceramic knives in paring, utility, slicing and chef sizes, plus a peeler. Lightweight blades that resist rust and keep fruit and vegetables fresh.",
+      "category": "Home & Kitchen",
+      "image": "/products/aliexpress/ceramic-knife-set.webp",
+      "images": [
+        "/products/aliexpress/ceramic-knife-set.webp",
+        "/products/aliexpress/ceramic-knife-set-2.webp",
+        "/products/aliexpress/ceramic-knife-set-3.webp",
+        "/products/aliexpress/ceramic-knife-set-4.webp"
+      ],
+      "sku": "AE-HK-005",
+      "pricePesewas": 4016,
+      "originalPricePesewas": 9795,
+      "stock": 30,
+      "status": "active"
+    },
+    {
+      "id": "prod-26",
+      "businessId": "biz-6",
+      "businessName": "Adom Home Essentials",
+      "name": "2-Tier Detachable Dish Drying Rack",
+      "description": "Countertop dish rack with two detachable tiers, utensil holder and draining tray. Carbon steel frame keeps plates, bowls and cups organised.",
+      "category": "Home & Kitchen",
+      "image": "/products/aliexpress/2-tier-dish-drying-rack.webp",
+      "images": [
+        "/products/aliexpress/2-tier-dish-drying-rack.webp",
+        "/products/aliexpress/2-tier-dish-drying-rack-2.webp",
+        "/products/aliexpress/2-tier-dish-drying-rack-3.webp",
+        "/products/aliexpress/2-tier-dish-drying-rack-4.webp"
+      ],
+      "sku": "AE-HK-006",
+      "pricePesewas": 16400,
+      "originalPricePesewas": 32800,
+      "stock": 18,
+      "status": "active"
+    },
+    {
+      "id": "1",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Premium Wireless Headphones",
+      "description": "Experience crystal-clear audio with our premium wireless headphones featuring active noise cancellation and 30-hour battery life.",
+      "category": "Electronics",
+      "image": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1484704849700-f032a568e944?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 19999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "2",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Classic Leather Watch",
+      "description": "Elegant timepiece with genuine leather strap and sapphire crystal glass. Water-resistant up to 50 meters.",
+      "category": "Accessories",
+      "image": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1522312346375-d1a52e2b99b3?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 29999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "3",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Minimalist Leather Bag",
+      "description": "Handcrafted leather bag with multiple compartments. Perfect for work and everyday use.",
+      "category": "Fashion",
+      "image": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 14999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "4",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Smart Home Speaker",
+      "description": "Voice-controlled smart speaker with premium sound quality and smart home integration.",
+      "category": "Electronics",
+      "image": "https://images.unsplash.com/photo-1589492477829-5e65395b66cc?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1589492477829-5e65395b66cc?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1543512214-318c7553f230?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 12999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "5",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Organic Skincare Set",
+      "description": "Complete skincare routine with organic ingredients. Includes cleanser, toner, and moisturizer.",
+      "category": "Beauty",
+      "image": "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1570194065650-d99fb4b38b15?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 8999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "6",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Ceramic Vase Collection",
+      "description": "Handcrafted ceramic vases with modern minimalist design. Perfect for home decoration.",
+      "category": "Home & Living",
+      "image": "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 5999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "7",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Wireless Charging Pad",
+      "description": "Fast wireless charging pad compatible with all Qi-enabled devices. Sleek and compact design.",
+      "category": "Gadgets",
+      "image": "https://images.unsplash.com/photo-1586816879360-004f5b0c51e5?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1586816879360-004f5b0c51e5?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1591815302525-756a9bcc3425?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 4999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "8",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Premium Sunglasses",
+      "description": "UV-protected polarized sunglasses with lightweight titanium frame. Classic aviator style.",
+      "category": "Accessories",
+      "image": "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 17999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "9",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Linen Throw Blanket",
+      "description": "Soft and breathable linen throw blanket. Perfect for cozy evenings and home decoration.",
+      "category": "Home & Living",
+      "image": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 7999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "10",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Portable Power Bank",
+      "description": "20000mAh portable power bank with fast charging. Compact design with LED indicator.",
+      "category": "Gadgets",
+      "image": "https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1594613534629-fa5c6c3e7e9e?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 3999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "11",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Silk Scarf Collection",
+      "description": "Luxurious 100% silk scarves with elegant patterns. Hand-rolled edges for premium finish.",
+      "category": "Fashion",
+      "image": "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 8999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    },
+    {
+      "id": "12",
+      "businessId": "nkay-shop",
+      "businessName": "NKAY Shop",
+      "name": "Aromatherapy Diffuser",
+      "description": "Ultrasonic aromatherapy diffuser with LED lighting. Whisper-quiet operation with auto shut-off.",
+      "category": "Home & Living",
+      "image": "https://images.unsplash.com/photo-1602928321679-560bb453f190?w=600&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1602928321679-560bb453f190?w=600&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=600&h=600&fit=crop"
+      ],
+      "sku": "",
+      "pricePesewas": 6999,
+      "originalPricePesewas": null,
+      "stock": 50,
+      "status": "active"
+    }
+  ]
+}

@@ -11,27 +11,27 @@ export const homepageBanners: HomepageBanner[] = [
   {
     image: "/images/glorriet.png",
     title: "Glorriet Beauty Bloom",
-    link: "/discover",
+    link: "/search",
   },
   {
     image: "/images/qweku.png",
     title: "Qweku Khapii",
-    link: "/discover",
+    link: "/search",
   },
   {
     image: "/images/trendora.png",
     title: "Trendora Fashion Hub",
-    link: "/discover",
+    link: "/search",
   },
   {
     image: "/images/knorr.png",
     title: "Knorr Collection",
-    link: "/discover",
+    link: "/search",
   },
   {
     image: "/images/listeve.png",
     title: "Listeve Laundry Services",
-    link: "/discover",
+    link: "/search",
   },
 ];
 

@@ -152,7 +152,7 @@ export const ProductSearch = () => {
             <img src={logoImage} alt="NKAY" className="h-10 w-auto" />
             <div className="flex items-center">
               <span className="text-2xl font-bold text-primary hidden sm:inline">NKAY</span>
-              <span className="text-xs text-text-light ml-2 hidden md:inline">SHOP • SELL • GROW</span>
+              <span className="text-xs text-text-light ml-2 hidden md:inline whitespace-nowrap">0257 463 603</span>
             </div>
           </Link>
 
