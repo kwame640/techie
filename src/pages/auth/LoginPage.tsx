@@ -212,15 +212,6 @@ export const LoginPage = () => {
 
         {/* Form panel */}
         <section className="flex flex-col justify-center p-6 sm:p-10 lg:p-12">
-          <div className="mb-6 flex items-center justify-between gap-4 sm:mb-8">
-            <Link
-              to="/"
-              className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-[#927f74] transition hover:text-[#6f3d27]"
-            >
-              Back to marketplace <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-
           {isAuthenticated && hasFirebaseSession && (
             <div className="mb-5 flex items-start gap-2 rounded-xl border border-[#d9e7dd] bg-[#f2f8f4] p-3 text-xs text-[#2f6b45]">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
