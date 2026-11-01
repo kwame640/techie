@@ -105,6 +105,7 @@ export const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [hasFirebaseSession, setHasFirebaseSession] = useState(false);
 
   const { login, signup, loginWithGoogle, isAuthenticated } = useAuth();
@@ -121,6 +122,7 @@ export const LoginPage = () => {
     if (next === mode) return;
     setMode(next);
     setError('');
+    setNotice('');
     setPassword('');
     setConfirmPassword('');
   };
@@ -128,6 +130,7 @@ export const LoginPage = () => {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError('');
+    setNotice('');
 
     const cleanEmail = email.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
@@ -152,7 +155,17 @@ export const LoginPage = () => {
       }
       navigate('/');
     } catch (authError) {
-      setError(friendlyAuthError(authError, mode));
+      const code = (authError as { code?: string } | null)?.code;
+      // The email already belongs to an account: no dead-end warning, just
+      // move the visitor to the sign-in form with the email still filled in.
+      if (mode === 'signup' && code === 'auth/email-already-in-use') {
+        setMode('signin');
+        setConfirmPassword('');
+        setError('');
+        setNotice('This email already has an account, so we switched to sign in. Enter your password to continue.');
+      } else {
+        setError(friendlyAuthError(authError, mode));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -160,6 +173,7 @@ export const LoginPage = () => {
 
   const handleGoogle = async () => {
     setError('');
+    setNotice('');
     setIsSubmitting(true);
     try {
       await loginWithGoogle('customer');
@@ -261,6 +275,16 @@ export const LoginPage = () => {
             <p className="mt-2 text-sm text-[#806e64]">
               Sign in to track orders and check out faster.
             </p>
+          )}
+
+          {notice && (
+            <div
+              role="status"
+              className="mt-5 flex items-start gap-2 rounded-xl border border-[#e7ddd7] bg-[#fbf7f4] p-3 text-sm text-[#6f3d27]"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{notice}</span>
+            </div>
           )}
 
           {error && (
