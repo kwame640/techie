@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Product, CartItem } from '../types';
+import { useAuth } from './AuthContext';
 
 export interface LastAddedItem {
   product: Product;
@@ -28,6 +29,17 @@ interface ShopContextType {
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
+const GUEST_CART_KEY = 'cart:guest';
+const GUEST_WISHLIST_KEY = 'wishlist:guest';
+
+// Carts and wishlists belong to the account that created them. Guests get
+// their own storage, so a brand-new visitor always starts with 0 items and a
+// new account never inherits another user's cart from the same device.
+const storageKeysFor = (userId?: string) =>
+  userId
+    ? { cart: `cart:user:${userId}`, wishlist: `wishlist:user:${userId}` }
+    : { cart: GUEST_CART_KEY, wishlist: GUEST_WISHLIST_KEY };
+
 const readStoredList = <T,>(key: string): T[] => {
   try {
     const raw = localStorage.getItem(key);
@@ -39,22 +51,77 @@ const readStoredList = <T,>(key: string): T[] => {
   }
 };
 
+const mergeCarts = (target: CartItem[], extra: CartItem[]): CartItem[] => {
+  const byProductId = new Map(target.map((item) => [item.product.id, item]));
+  for (const item of extra) {
+    const existing = byProductId.get(item.product.id);
+    byProductId.set(
+      item.product.id,
+      existing ? { ...existing, quantity: existing.quantity + item.quantity } : item
+    );
+  }
+  return Array.from(byProductId.values());
+};
+
+const mergeWishlist = (target: Product[], extra: Product[]): Product[] => {
+  const ids = new Set(target.map((product) => product.id));
+  return [...target, ...extra.filter((product) => !ids.has(product.id))];
+};
+
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const storageKeys = storageKeysFor(user?.id);
+
   // Read persisted data in the lazy initialiser. A separate load effect would
   // race the save effect and overwrite the stored cart with the empty state.
-  const [cart, setCart] = useState<CartItem[]>(() => readStoredList<CartItem>('cart'));
-  const [wishlist, setWishlist] = useState<Product[]>(() => readStoredList<Product>('wishlist'));
+  const [cart, setCart] = useState<CartItem[]>(() => readStoredList<CartItem>(storageKeys.cart));
+  const [wishlist, setWishlist] = useState<Product[]>(() => readStoredList<Product>(storageKeys.wishlist));
   const [lastAdded, setLastAdded] = useState<LastAddedItem | null>(null);
   const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
   const [checkoutEmail, setCheckoutEmail] = useState('');
 
+  // Track which storage key the in-memory data belongs to so switching
+  // accounts never writes one user's cart under another user's key.
+  const cartKeyRef = useRef(storageKeys.cart);
+  const wishlistKeyRef = useRef(storageKeys.wishlist);
+
+  // Switch carts when the signed-in account changes. Items a guest added are
+  // carried into the account they sign in with, then the guest cart is cleared.
+  useEffect(() => {
+    if (cartKeyRef.current === storageKeys.cart) return;
+    const previousKey = cartKeyRef.current;
+    cartKeyRef.current = storageKeys.cart;
+    const stored = readStoredList<CartItem>(storageKeys.cart);
+
+    if (previousKey === GUEST_CART_KEY && user?.id) {
+      localStorage.removeItem(previousKey);
+      setCart(mergeCarts(stored, cart));
+      return;
+    }
+    setCart(stored);
+  }, [storageKeys.cart, user?.id, cart]);
+
+  useEffect(() => {
+    if (wishlistKeyRef.current === storageKeys.wishlist) return;
+    const previousKey = wishlistKeyRef.current;
+    wishlistKeyRef.current = storageKeys.wishlist;
+    const stored = readStoredList<Product>(storageKeys.wishlist);
+
+    if (previousKey === GUEST_WISHLIST_KEY && user?.id) {
+      localStorage.removeItem(previousKey);
+      setWishlist(mergeWishlist(stored, wishlist));
+      return;
+    }
+    setWishlist(stored);
+  }, [storageKeys.wishlist, user?.id, wishlist]);
+
   // Save to localStorage
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cart));
+    localStorage.setItem(cartKeyRef.current, JSON.stringify(cart));
   }, [cart]);
-  
+
   useEffect(() => {
-    localStorage.setItem('wishlist', JSON.stringify(wishlist));
+    localStorage.setItem(wishlistKeyRef.current, JSON.stringify(wishlist));
   }, [wishlist]);
   
   const addToCart = (product: Product, quantity = 1, color?: string, size?: string) => {

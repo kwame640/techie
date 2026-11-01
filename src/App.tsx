@@ -142,8 +142,8 @@ const BusinessProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ child
 
 function App() {
   return (
-    <ShopProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <ShopProvider>
         <NotificationProvider>
           <Router>
         <Routes>
@@ -314,8 +314,8 @@ function App() {
         <CheckoutSignInModal />
       </Router>
         </NotificationProvider>
-      </AuthProvider>
-    </ShopProvider>
+      </ShopProvider>
+    </AuthProvider>
   );
 }
 
