@@ -88,7 +88,17 @@ const highlights = [
 ];
 
 export const LoginPage = () => {
-  const [mode, setMode] = useState<Mode>('signin');
+  // New visitors have no account on this device, so open on "Create account";
+  // returning customers who already signed in here open on "Sign in".
+  const [mode, setMode] = useState<Mode>(() => {
+    try {
+      const hasCustomerAccount =
+        localStorage.getItem('userRole') === 'customer' && !!localStorage.getItem('user');
+      return hasCustomerAccount ? 'signin' : 'signup';
+    } catch {
+      return 'signup';
+    }
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
