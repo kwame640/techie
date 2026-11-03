@@ -69,14 +69,30 @@ function friendlyAuthError(error: unknown, mode: Mode): string {
       return 'Google sign-in was cancelled.';
     case 'auth/popup-blocked':
       return 'Your browser blocked the Google sign-in window. Allow pop-ups and try again.';
+    case 'auth/unauthorized-domain':
+      return 'Google sign-in isn’t allowed from this web address. Use http://localhost:5173 or https://nkaygh.vercel.app, or ask NKAY support to authorize this domain.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account with this email already exists with a different sign-in method. Sign in with your email and password instead.';
+    case 'auth/access-denied':
+      return 'Google blocked this sign-in. If NKAY’s Google app is in testing mode, add this Google account as a test user or publish the app.';
+    case 'auth/operation-not-supported-in-this-environment':
+      return 'Google sign-in isn’t supported in this browser. Try Chrome or Safari.';
+    case 'auth/api-key-not-valid':
+    case 'auth/invalid-api-key':
+    case 'auth/configuration-not-found':
+      return 'Google sign-in is misconfigured. Please contact NKAY support.';
+    case 'auth/internal-error':
+      return 'Google sign-in couldn’t complete. Close the pop-up and try again.';
+    case 'auth/web-storage-unsupported':
+      return 'Your browser is blocking the storage Google sign-in needs. Enable cookies and site data, then try again.';
     case 'auth/network-request-failed':
       return 'Network error. Check your connection and try again.';
     case 'auth/operation-not-allowed':
       return 'This sign-in method isn’t enabled. Please contact NKAY support.';
     default: {
-      const message = (error as Error | null)?.message || '';
-      return message.replace(/^Firebase:\s*/, '').replace(/\s*\(auth\/[^)]+\)\.?$/, '') ||
-        'Something went wrong. Please try again.';
+      return code
+        ? `Something went wrong (${code}). Please try again.`
+        : 'Something went wrong. Please try again.';
     }
   }
 }
@@ -179,7 +195,26 @@ export const LoginPage = () => {
       await loginWithGoogle('customer');
       navigate('/');
     } catch (authError) {
-      setError(friendlyAuthError(authError, mode));
+      const code = (authError as { code?: string } | null)?.code;
+      // The Google email already belongs to a password account. Rather than
+      // dead-ending on an error, move them to sign in with the email filled in.
+      if (code === 'auth/account-exists-with-different-credential') {
+        const conflict = authError as {
+          customData?: { email?: string };
+          email?: string;
+        } | null;
+        const conflictedEmail = conflict?.customData?.email || conflict?.email;
+        if (conflictedEmail) setEmail(conflictedEmail);
+        setMode('signin');
+        setConfirmPassword('');
+        setError('');
+        setNotice(
+          'This email already has an NKAY account. Sign in with your password below, then you can use Google next time.'
+        );
+        window.setTimeout(() => document.getElementById('login-password')?.focus(), 0);
+      } else {
+        setError(friendlyAuthError(authError, mode));
+      }
     } finally {
       setIsSubmitting(false);
     }
