@@ -300,7 +300,7 @@ export const MarketplaceHome = () => {
               <img src={logoImage} alt="NKAY" className="h-9 w-auto flex-shrink-0" />
               <div className="flex items-center min-w-0">
                 <span className="text-xl font-bold text-primary">NKAY</span>
-                <span className="text-[10px] text-text-light ml-1.5 whitespace-nowrap">0257 463 603</span>
+                <span className="text-[10px] text-text-light ml-1.5 whitespace-nowrap tracking-wide">KOFORIDUA</span>
               </div>
             </Link>
             <div className="flex items-center gap-1">
@@ -335,7 +335,7 @@ export const MarketplaceHome = () => {
               <img src={logoImage} alt="NKAY" className="h-10 w-auto" />
               <div className="flex items-center">
                 <span className="text-2xl font-bold text-primary">NKAY</span>
-                <span className="text-xs text-text-light ml-2 hidden xl:inline whitespace-nowrap">0257 463 603</span>
+                <span className="text-xs text-text-light ml-2 hidden xl:inline whitespace-nowrap tracking-wide">KOFORIDUA</span>
               </div>
             </Link>
 
