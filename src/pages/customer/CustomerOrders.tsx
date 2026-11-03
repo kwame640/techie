@@ -17,7 +17,7 @@ function badge(order: OrderView) {
     return { label: 'Paid', className: 'bg-green-100 text-green-700' };
   }
   if (order.paymentStatus === 'processing') {
-    return { label: 'Pay on Flutterwave', className: 'bg-blue-100 text-blue-700' };
+    return { label: 'Pay on ExpressPay', className: 'bg-blue-100 text-blue-700' };
   }
   if (order.paymentStatus === 'attention') {
     return { label: 'Needs attention', className: 'bg-red-100 text-red-700' };

@@ -17,11 +17,11 @@ import {
   initiateOrderPayment,
   verifyOrderPayment,
   recheckOrderPayment,
-  handleFlutterwaveWebhook,
+  handleExpressPayCallback,
   reconcilePendingPayments,
   listAllOrders,
 } from './controllers/orderController.js';
-import { isFlutterwaveConfigured, getFlutterwaveConfig } from './services/flutterwaveService.js';
+import { isExpressPayConfigured, getExpressPayConfig } from './services/expresspayService.js';
 import { authenticateAdmin } from './middleware/auth.js';
 import { authenticateVendor, requireVendorOwnership } from './middleware/vendorAuth.js';
 import { createVendorToken, verifyVendorToken } from './services/vendorSession.js';
@@ -443,11 +443,11 @@ app.post('/api/otp/verify', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Orders & Flutterwave payments
+// Orders & ExpressPay payments
 // Prices and stock are resolved from the server-side catalogue; amounts sent
-// by the browser are never trusted. Customers pay on Flutterwave's hosted
-// checkout and the server verifies every transaction with Flutterwave before
-// marking an order paid and decrementing stock.
+// by the browser are never trusted. Customers pay on ExpressPay's hosted
+// checkout and the server verifies every payment with ExpressPay's Query API
+// before marking an order paid and decrementing stock.
 // ---------------------------------------------------------------------------
 app.post('/api/orders/quote', quoteOrder);
 app.post('/api/orders', createOrder);
@@ -457,7 +457,7 @@ app.post('/api/orders/:id/pay', initiateOrderPayment);
 app.post('/api/orders/:id/payment/verify', verifyOrderPayment);
 
 app.get('/api/payments/settings', getPaymentSettings);
-app.post('/api/payments/flutterwave/webhook', handleFlutterwaveWebhook);
+app.post('/api/payments/expresspay/callback', handleExpressPayCallback);
 
 app.get('/api/admin/orders', authenticateAdmin, listAllOrders);
 app.post('/api/admin/orders/:id/payment/verify', authenticateAdmin, recheckOrderPayment);
@@ -465,14 +465,14 @@ app.get('/api/admin/payment-settings', authenticateAdmin, getAdminPaymentSetting
 
 // Health check
 app.get('/api/health', (req, res) => {
-  const config = getFlutterwaveConfig();
+  const config = getExpressPayConfig();
   res.json({
     status: 'ok',
     message: 'Server is running',
     payments: {
-      method: 'flutterwave',
-      configured: isFlutterwaveConfigured(),
-      callbackConfigured: config.webhookConfigured,
+      method: 'expresspay',
+      configured: isExpressPayConfigured(),
+      callbackConfigured: config.callbackConfigured,
       missing: config.configured ? [] : config.missing,
     },
   });
@@ -514,17 +514,17 @@ const isDirectEntry = process.argv[1] && (process.argv[1] === fileURLToPath(impo
 if (isDirectEntry) {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    if (isFlutterwaveConfigured()) {
-      console.log(`Flutterwave payments: configured (${getFlutterwaveConfig().mode} mode)`);
+    if (isExpressPayConfigured()) {
+      console.log(`ExpressPay payments: configured (${getExpressPayConfig().mode} mode)`);
     } else {
-      console.warn(`Flutterwave payments: NOT configured (missing ${getFlutterwaveConfig().missing.join(', ')})`);
+      console.warn(`ExpressPay payments: NOT configured (missing ${getExpressPayConfig().missing.join(', ')})`);
     }
-    if (!getFlutterwaveConfig().webhookConfigured) {
-      console.warn('Flutterwave webhooks: NOT configured (set PUBLIC_SERVER_URL and FLW_WEBHOOK_SECRET_HASH)');
+    if (!getExpressPayConfig().callbackConfigured) {
+      console.warn('ExpressPay callback: NOT configured (set a public HTTPS PUBLIC_SERVER_URL)');
     }
   });
 
-  // Safety net for missed webhooks: re-check live payments with Flutterwave.
+  // Safety net for missed callbacks: re-check live payments with ExpressPay.
   // Timers do not run under Vercel serverless, so this only starts for the
   // standalone server. Serverless deployments still verify on page poll and
   // whenever an admin re-checks an order.

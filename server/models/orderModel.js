@@ -53,8 +53,8 @@ export function createOrder(order) {
   const record = {
     ...order,
     orderNumber,
-    // The order number is the initial payment reference. Flutterwave gets a
-    // unique tx_ref per checkout attempt, which is stored when payment starts.
+    // The order number is the initial payment reference. ExpressPay gets a
+    // unique reference per checkout attempt, which is stored when payment starts.
     paymentReference: order.paymentReference || orderNumber,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -78,6 +78,18 @@ export function getOrderByReference(reference) {
         order.orderNumber === needle ||
         order.paymentReference === needle ||
         (Array.isArray(order.paymentReferences) && order.paymentReferences.includes(needle))
+    ) || null
+  );
+}
+
+export function getOrderByPaymentToken(token) {
+  const needle = String(token || '').trim();
+  if (!needle) return null;
+  return (
+    readDb().find(
+      (order) =>
+        order.paymentToken === needle ||
+        (Array.isArray(order.paymentTokens) && order.paymentTokens.includes(needle))
     ) || null
   );
 }

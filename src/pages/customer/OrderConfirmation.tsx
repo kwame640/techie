@@ -28,7 +28,7 @@ const MAX_POLLS = 60;
 
 function paymentMethodName(method: string | null | undefined) {
   const value = String(method || '').toLowerCase();
-  if (!value) return 'Flutterwave';
+  if (!value) return 'ExpressPay';
   if (value.includes('mobilemoney') || value.includes('mobile_money')) return 'Mobile money';
   if (value === 'card') return 'Card';
   if (value.includes('bank')) return 'Bank transfer';
@@ -41,7 +41,7 @@ function statusMeta(order: OrderView, linkExpired: boolean) {
     return {
       tone: 'paid' as const,
       title: 'Payment confirmed',
-      message: 'Flutterwave confirmed your payment. The seller is preparing your order.',
+      message: 'ExpressPay confirmed your payment. The seller is preparing your order.',
       Icon: CheckCircle2,
     };
   }
@@ -61,14 +61,14 @@ function statusMeta(order: OrderView, linkExpired: boolean) {
           tone: 'pending' as const,
           title: 'Payment session expired',
           message:
-            'The Flutterwave checkout session ended. If you were not charged, you can start a new payment below.',
+            'The ExpressPay checkout session ended. If you were not charged, you can start a new payment below.',
           Icon: Clock,
         }
       : {
           tone: 'processing' as const,
-          title: 'Complete your payment on Flutterwave',
+          title: 'Complete your payment on ExpressPay',
           message:
-            'Finish your payment on the secure Flutterwave page. This page updates automatically once it is confirmed.',
+            'Finish your payment on the secure ExpressPay page. This page updates automatically once it is confirmed.',
           Icon: CreditCard,
         };
   }
@@ -86,7 +86,7 @@ function statusMeta(order: OrderView, linkExpired: boolean) {
     tone: 'pending' as const,
     title: 'Complete your payment',
     message:
-      'Pay securely with Flutterwave using mobile money, a card or bank transfer. Your order is confirmed after payment is verified.',
+      'Pay securely with ExpressPay using mobile money, a card or bank transfer. Your order is confirmed after payment is verified.',
     Icon: CreditCard,
   };
 }
@@ -95,7 +95,7 @@ export const OrderConfirmation = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
   const routeState = (location.state as { payError?: string } | null) || null;
-  const returnedTransactionId = new URLSearchParams(location.search).get('transaction_id') || '';
+  const returnedToken = new URLSearchParams(location.search).get('token') || '';
 
   const [order, setOrder] = useState<OrderView | null>(null);
   const [settings, setSettings] = useState<PaymentSettings | null>(null);
@@ -163,10 +163,10 @@ export const OrderConfirmation = () => {
     order?.paymentStatus === 'processing' && linkExpiresAt && now > linkExpiresAt
   );
 
-  // When Flutterwave redirects back it adds ?transaction_id=... . Verify that
-  // exact transaction once; the server still asks Flutterwave for the truth.
+  // When ExpressPay redirects back it adds ?order-id=...&token=... . Verify that
+  // exact checkout once; the server still asks ExpressPay's Query API for truth.
   useEffect(() => {
-    if (!order || !returnedTransactionId || redirectCheckedRef.current) return;
+    if (!order || !returnedToken || redirectCheckedRef.current) return;
     if (order.paymentStatus === 'paid' || order.paymentStatus === 'attention') return;
     redirectCheckedRef.current = true;
 
@@ -174,16 +174,16 @@ export const OrderConfirmation = () => {
       `/api/orders/${encodeURIComponent(order.id)}/payment/verify`,
       {
         method: 'POST',
-        body: JSON.stringify({ transactionId: returnedTransactionId }),
+        body: JSON.stringify({ token: returnedToken }),
       }
     )
       .then(applyResult)
       .catch(() => {
         setStatusMessage('We could not confirm the payment yet. Tap “Check status” in a moment.');
       });
-  }, [order, returnedTransactionId, applyResult]);
+  }, [order, returnedToken, applyResult]);
 
-  // While payment is in progress, ask the server to re-check with Flutterwave.
+  // While payment is in progress, ask the server to re-check with ExpressPay.
   // The browser never decides that a payment succeeded.
   useEffect(() => {
     if (!order || order.paymentStatus !== 'processing') return;
@@ -217,7 +217,7 @@ export const OrderConfirmation = () => {
         `/api/orders/${encodeURIComponent(order.id)}/payment/verify`,
         {
           method: 'POST',
-          body: JSON.stringify(returnedTransactionId ? { transactionId: returnedTransactionId } : {}),
+          body: JSON.stringify(returnedToken ? { token: returnedToken } : {}),
         }
       );
       applyResult(result);
@@ -251,13 +251,13 @@ export const OrderConfirmation = () => {
       }
 
       setStarting(false);
-      setStatusMessage(result.message || 'Flutterwave did not return a checkout link. Please try again.');
+      setStatusMessage(result.message || 'ExpressPay did not return a checkout link. Please try again.');
     } catch (payError) {
       setStarting(false);
       setActionError(
         payError instanceof ApiError
           ? payError.message
-          : 'We could not start the Flutterwave checkout. Please try again.'
+          : 'We could not start the ExpressPay checkout. Please try again.'
       );
       // Reflect whatever the server now knows (e.g. attention or a link that
       // was just created) instead of leaving a stale order on screen.
@@ -310,7 +310,7 @@ export const OrderConfirmation = () => {
 
   const badge = {
     paid: { label: 'Paid', className: 'bg-green-100 text-green-700' },
-    processing: { label: 'Pay on Flutterwave', className: 'bg-blue-100 text-blue-700' },
+    processing: { label: 'Pay on ExpressPay', className: 'bg-blue-100 text-blue-700' },
     failed: { label: 'Not confirmed', className: 'bg-red-100 text-red-700' },
     attention: { label: 'Needs attention', className: 'bg-red-100 text-red-700' },
     pending: { label: 'Awaiting payment', className: 'bg-amber-100 text-amber-700' },
@@ -410,7 +410,7 @@ export const OrderConfirmation = () => {
             {(canPay || order.paymentStatus === 'processing' || order.paymentStatus === 'attention') && (
               <div className="mt-5 rounded-2xl border border-[#eee5df] bg-[#fcfaf9] p-4 sm:p-5">
                 <h3 className="text-sm font-bold flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-[#6f3d27]" /> Flutterwave secure checkout
+                  <CreditCard className="w-4 h-4 text-[#6f3d27]" /> ExpressPay secure checkout
                 </h3>
 
                 {!paymentsEnabled && (
@@ -428,10 +428,10 @@ export const OrderConfirmation = () => {
                     <div className="rounded-xl border border-blue-200 bg-white p-4">
                       <p className="text-sm text-[#5f5148]">
                         Your <span className="font-semibold">{formatGhs(order.total)}</span> payment is waiting on
-                        Flutterwave. Finish it there and this page will confirm automatically.
+                        ExpressPay. Finish it there and this page will confirm automatically.
                       </p>
                       <p className="text-xs text-[#927f74] mt-2">
-                        Enter your mobile money PIN, card details or bank login only on the Flutterwave page. NKAY never
+                        Enter your mobile money PIN, card details or bank login only on the ExpressPay page. NKAY never
                         asks for them.
                       </p>
                       {order.paymentLinkExpiresAt && (
@@ -452,7 +452,7 @@ export const OrderConfirmation = () => {
                         href={order.paymentLink}
                         className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#6f3d27] px-4 py-3 text-sm font-semibold text-white hover:bg-[#5d3524] transition"
                       >
-                        <ExternalLink className="w-4 h-4" /> Continue to Flutterwave
+                        <ExternalLink className="w-4 h-4" /> Continue to ExpressPay
                       </a>
                     )}
 
@@ -478,7 +478,7 @@ export const OrderConfirmation = () => {
 
                     {linkExpired && (
                       <p className="mb-3 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
-                        The Flutterwave checkout session expired. If you were not charged, you can start a new payment
+                        The ExpressPay checkout session expired. If you were not charged, you can start a new payment
                         below.
                       </p>
                     )}
@@ -491,16 +491,16 @@ export const OrderConfirmation = () => {
                     >
                       {starting ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" /> Opening Flutterwave…
+                          <Loader2 className="w-4 h-4 animate-spin" /> Opening ExpressPay…
                         </>
                       ) : (
                         <>
-                          <CreditCard className="w-4 h-4" /> Pay {formatGhs(order.total)} with Flutterwave
+                          <CreditCard className="w-4 h-4" /> Pay {formatGhs(order.total)} with ExpressPay
                         </>
                       )}
                     </button>
                     <p className="mt-2 text-center text-[11px] text-[#9a887d]">
-                      You will be redirected to Flutterwave. Mobile money, debit/credit card and bank transfer are
+                      You will be redirected to ExpressPay. Mobile money, debit/credit card and bank transfer are
                       accepted.
                     </p>
                   </div>
@@ -512,7 +512,7 @@ export const OrderConfirmation = () => {
                     <p className="mt-1">{order.failureReason}</p>
                     {order.amountPaid != null && (
                       <p className="mt-1 text-xs">
-                        Amount Flutterwave confirmed:{' '}
+                        Amount ExpressPay confirmed:{' '}
                         <span className="font-semibold">{formatGhs(order.amountPaid)}</span>
                       </p>
                     )}
@@ -583,11 +583,11 @@ export const OrderConfirmation = () => {
               <div className="mt-2 space-y-1.5 text-sm text-[#806e64]">
                 <p className="flex items-center gap-2">
                   <CreditCard className="w-4 h-4" />
-                  {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'Flutterwave'}
+                  {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'ExpressPay'}
                 </p>
                 <p className="text-xs break-all">Reference: {reference}</p>
                 {order.paymentTransactionId && (
-                  <p className="text-xs break-all">Flutterwave ID: {order.paymentTransactionId}</p>
+                  <p className="text-xs break-all">ExpressPay ID: {order.paymentTransactionId}</p>
                 )}
                 {order.amountPaid != null && order.paymentStatus !== 'failed' && (
                   <p className="text-xs">
@@ -604,14 +604,14 @@ export const OrderConfirmation = () => {
               {order.paymentStatus === 'paid' && (
                 <p className="mt-3 rounded-lg bg-[#f5faf5] p-2.5 text-[11px] text-[#45704c] flex gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  Payment verified with Flutterwave. Keep your order number for support.
+                  Payment verified with ExpressPay. Keep your order number for support.
                 </p>
               )}
 
               {order.paymentStatus === 'processing' && (
                 <p className="mt-3 rounded-lg bg-blue-50 p-2.5 text-[11px] text-blue-800 flex gap-1.5">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
-                  This order is confirmed automatically once Flutterwave verifies your payment.
+                  This order is confirmed automatically once ExpressPay verifies your payment.
                 </p>
               )}
 

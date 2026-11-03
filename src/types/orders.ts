@@ -30,9 +30,9 @@ export interface OrderDelivery {
 }
 
 /**
- * pending     — order created; no Flutterwave checkout link yet.
- * processing  — Flutterwave checkout link created; customer is paying.
- * paid        — Flutterwave verified the payment; stock has been reserved.
+ * pending     — order created; no ExpressPay checkout token yet.
+ * processing  — ExpressPay checkout token created; customer is paying.
+ * paid        — ExpressPay verified the payment; stock has been reserved.
  * failed      — the payment failed, was cancelled, or the checkout expired.
  * attention   — money was received but cannot be fulfilled automatically
  *               (stock gone or amount mismatch). Requires a human/refund.
@@ -51,9 +51,9 @@ export interface OrderView {
   deliveryFee: number;
   total: number;
   paymentStatus: OrderPaymentStatus;
-  paymentChannel: 'flutterwave' | 'mobile_money' | null;
+  paymentChannel: 'expresspay' | 'mobile_money' | null;
   paymentProvider: string | null;
-  /** Flutterwave payment type, e.g. card or mobilemoneygh. */
+  /** ExpressPay transaction type when known, e.g. card or mobile money. */
   paymentMethod: string | null;
   paymentPhone: string | null;
   paymentReference: string | null;
@@ -72,7 +72,7 @@ export interface OrderView {
 }
 
 export interface PaymentSettings {
-  method: 'flutterwave';
+  method: 'expresspay';
   providerName: string;
   enabled: boolean;
   callbackConfigured: boolean;
@@ -80,14 +80,15 @@ export interface PaymentSettings {
 }
 
 export interface AdminPaymentSettings extends PaymentSettings {
-  mode: 'test' | 'live' | 'unset';
-  secretKeySet: boolean;
-  publicKeySet: boolean;
-  webhookSecretSet: boolean;
-  webhookUrl: string | null;
-  webhookSecure: boolean;
-  redirectUrlPattern: string | null;
+  mode: 'sandbox' | 'live';
+  merchantIdSet: boolean;
+  apiKeySet: boolean;
+  checkoutBaseUrl: string;
+  callbackUrl: string | null;
+  callbackSecure: boolean;
+  returnUrlPattern: string | null;
   sessionMinutes: number;
+  ipAllowlistRequired: boolean;
 }
 
 export interface PaymentVerificationResult {

@@ -2,6 +2,7 @@ import { getCatalogueMeta, getProduct, getBusiness, getDeliveryFeePesewas, reser
 import {
   createOrder as persistOrder,
   getOrderById,
+  getOrderByPaymentToken,
   findByIdempotencyKey,
   getOrderByReference,
   updateOrder,
@@ -10,24 +11,23 @@ import {
   newOrderId,
 } from '../models/orderModel.js';
 import {
-  adminFlutterwaveSettings,
-  createPaymentLink,
-  getFlutterwaveConfig,
-  isFlutterwaveConfigured,
-  paymentRedirectUrl,
-  publicFlutterwaveSettings,
-  verifyTransactionById,
-  verifyTransactionByReference,
-  verifyWebhookSignature,
-} from '../services/flutterwaveService.js';
+  adminExpressPaySettings,
+  createCheckout,
+  getExpressPayConfig,
+  IP_ALLOWLIST_HELP,
+  isExpressPayConfigured,
+  paymentReturnUrl,
+  publicExpressPaySettings,
+  queryTransaction,
+} from '../services/expresspayService.js';
 import { randomBytes } from 'crypto';
 
 const MAX_ITEMS = 20;
 const MAX_QUANTITY = 99;
 
-// A hosted Flutterwave payment link lives for FLW_SESSION_MINUTES (60 by
-// default). We reuse the live link instead of creating a new one, and never
-// create more than this many links for a single order.
+// An ExpressPay hosted checkout token lives for EXPAY_SESSION_MINUTES (60 by
+// default). We reuse the live checkout instead of creating a new one, and never
+// create more than this many tokens for a single order.
 const MAX_PAYMENT_ATTEMPTS = 5;
 const PAYMENT_LINK_MIN_INTERVAL_MS = 20 * 1000;
 
@@ -251,12 +251,12 @@ export function createOrder(req, res) {
       }
     }
 
-    if (!isFlutterwaveConfigured()) {
+    if (!isExpressPayConfigured()) {
       throw httpError(
         503,
         'Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getFlutterwaveConfig().missing }
+        { missing: getExpressPayConfig().missing }
       );
     }
 
@@ -307,12 +307,14 @@ export function createOrder(req, res) {
       idempotencyKey: idempotencyKey || null,
       paymentStatus: 'pending',
       orderStatus: 'new',
-      paymentChannel: 'flutterwave',
-      paymentProvider: 'flutterwave',
+      paymentChannel: 'expresspay',
+      paymentProvider: 'expresspay',
       paymentMethod: null,
       paymentPhone: null,
       paymentReference: null,
       paymentReferences: [],
+      paymentToken: null,
+      paymentTokens: [],
       paymentLink: null,
       paymentLinkCreatedAt: null,
       paymentLinkExpiresAt: null,
@@ -361,31 +363,54 @@ export function listCustomerOrders(req, res) {
 }
 
 export function getPaymentSettings(_req, res) {
-  return res.json({ success: true, settings: publicFlutterwaveSettings() });
+  return res.json({ success: true, settings: publicExpressPaySettings() });
 }
 
 export function getAdminPaymentSettings(_req, res) {
-  return res.json({ success: true, settings: adminFlutterwaveSettings() });
+  return res.json({ success: true, settings: adminExpressPaySettings() });
 }
 
-function paymentReferenceMatches(order, txRef) {
-  const reference = String(txRef || '').trim();
-  if (!reference) return false;
-  if (reference === order.orderNumber) return true;
-  if (reference === order.paymentReference) return true;
-  return Array.isArray(order.paymentReferences) && order.paymentReferences.includes(reference);
+function paymentReferenceMatches(order, reference) {
+  const needle = String(reference || '').trim();
+  if (!needle) return false;
+  if (needle === order.orderNumber) return true;
+  if (needle === order.paymentReference) return true;
+  return Array.isArray(order.paymentReferences) && order.paymentReferences.includes(needle);
+}
+
+function paymentTokenMatches(order, token) {
+  const needle = String(token || '').trim();
+  if (!needle) return false;
+  if (needle === order.paymentToken) return true;
+  return Array.isArray(order.paymentTokens) && order.paymentTokens.includes(needle);
 }
 
 /**
- * Applies a Flutterwave-verified paid result to an order.
+ * Resolves the ExpressPay checkout token to query for this order.
+ * A token supplied by the browser/callback is only accepted when it belongs to
+ * this order, so one customer can never trigger a lookup against another.
+ */
+function resolvePaymentToken(order, suppliedToken) {
+  const supplied = String(suppliedToken || '').trim();
+  if (supplied) {
+    if (!paymentTokenMatches(order, supplied)) {
+      throw httpError(400, 'The payment token does not match this order.', 'PAYMENT_TOKEN_MISMATCH');
+    }
+    return supplied;
+  }
+  return String(order.paymentToken || '').trim();
+}
+
+/**
+ * Applies an ExpressPay-verified paid result to an order.
  *
  * This function is deliberately synchronous: the final "is it paid?" check,
  * stock reservation and order write all happen in the same event-loop tick.
- * Two concurrent webhooks therefore cannot both decrement stock — the second
+ * Two concurrent callbacks therefore cannot both decrement stock — the second
  * sees `paymentStatus: 'paid'` and returns without touching inventory.
  *
- * `verification` comes from verifyTransactionById/ByReference(), never from a
- * webhook body or the browser.
+ * `verification` comes from the ExpressPay Query API, never from a callback
+ * body, the redirect query string or the browser.
  */
 function applyVerifiedPayment(orderId, verification, actor) {
   const current = getOrderById(orderId);
@@ -405,22 +430,23 @@ function applyVerifiedPayment(orderId, verification, actor) {
 
   const mismatchReason = (() => {
     if (!(paidPesewas > 0)) {
-      return 'Flutterwave confirmed a payment but did not return a valid amount. Please contact NKAY support — do not pay again.';
+      return 'ExpressPay confirmed a payment but did not return a valid amount. Please contact NKAY support — do not pay again.';
     }
     if (currency !== 'GHS') {
-      return `Flutterwave confirmed a payment in ${currency || 'an unknown currency'} instead of GHS. Please contact NKAY support — do not pay again.`;
+      return `ExpressPay confirmed a payment in ${currency || 'an unknown currency'} instead of GHS. Please contact NKAY support — do not pay again.`;
     }
     if (paidPesewas !== expectedPesewas) {
-      return `Flutterwave confirmed ${toGhs(paidPesewas)} but this order total is ${toGhs(expectedPesewas)}. Please contact NKAY support — do not pay again.`;
+      return `ExpressPay confirmed ${toGhs(paidPesewas)} but this order total is ${toGhs(expectedPesewas)}. Please contact NKAY support — do not pay again.`;
     }
     return '';
   })();
 
   const paymentDetails = {
-    paymentProvider: 'flutterwave',
-    paymentChannel: 'flutterwave',
+    paymentProvider: 'expresspay',
+    paymentChannel: 'expresspay',
     paymentMethod: verification.paymentMethod || current.paymentMethod || null,
     paymentTransactionId: transactionId,
+    paymentToken: verification.token || current.paymentToken || null,
     amountPaidPesewas: paidPesewas || null,
     paymentCurrency: currency || null,
     paymentCheckedAt: nowIso,
@@ -466,32 +492,39 @@ function applyVerifiedPayment(orderId, verification, actor) {
 }
 
 /**
- * Re-queries Flutterwave and records the authoritative result for an order.
- * Never trusts a webhook payload, a redirect query string, or a browser flag.
+ * Re-queries ExpressPay and records the authoritative result for an order.
+ * Never trusts a callback payload, a redirect query string, or a browser flag.
  */
-async function verifyPaymentForOrder(order, actor, { transactionId } = {}) {
-  const reference = String(order.paymentReference || order.orderNumber || '').trim();
-  const lookupId = String(transactionId || order.paymentTransactionId || '').trim();
-  if (!reference && !lookupId) {
-    return { order, state: 'pending', message: 'This order has no payment reference yet.' };
+async function verifyPaymentForOrder(order, actor, { token } = {}) {
+  const paymentToken = resolvePaymentToken(order, token);
+  if (!paymentToken) {
+    return {
+      order,
+      state: 'pending',
+      message: 'This order has no payment token yet. Start the payment again.',
+    };
   }
 
-  const verification = lookupId
-    ? await verifyTransactionById(lookupId)
-    : await verifyTransactionByReference(reference);
+  const verification = await queryTransaction(paymentToken);
 
   if (!verification.ok) {
+    if (verification.reason === 'not_configured') {
+      return { order, state: 'unavailable', message: 'ExpressPay is not configured on this server.' };
+    }
+    if (verification.reason === 'ip_blocked') {
+      return { order, state: 'unavailable', message: IP_ALLOWLIST_HELP };
+    }
     // Network/provider trouble is temporary: keep the order exactly as it is
     // and let the next poll or the reconciler try again.
     return {
       order,
       state: 'unavailable',
-      message: 'We could not reach Flutterwave to confirm this payment yet. This page will keep checking.',
+      message: 'We could not reach ExpressPay to confirm this payment yet. This page will keep checking.',
     };
   }
 
-  if (verification.txRef && !paymentReferenceMatches(order, verification.txRef)) {
-    const reason = 'Flutterwave returned payment details that do not match this order. Please contact NKAY support — do not pay again.';
+  if (verification.token && !paymentTokenMatches(order, verification.token)) {
+    const reason = 'ExpressPay returned payment details for a different checkout. Please contact NKAY support — do not pay again.';
     const updated = updateOrder(order.id, {
       paymentStatus: 'attention',
       paymentCheckedAt: new Date().toISOString(),
@@ -500,12 +533,8 @@ async function verifyPaymentForOrder(order, actor, { transactionId } = {}) {
     return { order: updated, state: 'attention', message: reason };
   }
 
-  if (
-    order.paymentTransactionId &&
-    verification.transactionId &&
-    String(order.paymentTransactionId) !== String(verification.transactionId)
-  ) {
-    const reason = 'Flutterwave returned a different transaction for this order. Please contact NKAY support — do not pay again.';
+  if (verification.orderReference && !paymentReferenceMatches(order, verification.orderReference)) {
+    const reason = 'ExpressPay returned payment details that do not match this order. Please contact NKAY support — do not pay again.';
     const updated = updateOrder(order.id, {
       paymentStatus: 'attention',
       paymentCheckedAt: new Date().toISOString(),
@@ -520,27 +549,17 @@ async function verifyPaymentForOrder(order, actor, { transactionId } = {}) {
 
   const nowIso = new Date().toISOString();
   const transactionDetails = {
-    paymentProvider: 'flutterwave',
-    paymentChannel: 'flutterwave',
+    paymentProvider: 'expresspay',
+    paymentChannel: 'expresspay',
     paymentMethod: verification.paymentMethod || order.paymentMethod || null,
     paymentTransactionId: verification.transactionId || order.paymentTransactionId || null,
+    paymentToken: verification.token || order.paymentToken || null,
     paymentCheckedAt: nowIso,
   };
 
-  if (verification.state === 'refunded') {
-    const reason = 'Flutterwave reports this payment was refunded. Contact NKAY support if you need help with this order.';
-    const updated = updateOrder(order.id, {
-      ...transactionDetails,
-      paymentStatus: 'failed',
-      orderStatus: 'new',
-      failureReason: reason,
-    });
-    return { order: updated, state: 'failed', message: reason };
-  }
-
   if (verification.state === 'failed') {
-    const reason = verification.processorResponse
-      ? `The payment was not completed (${verification.processorResponse}). You can try again.`
+    const reason = verification.resultText
+      ? `ExpressPay did not complete this payment (${verification.resultText}). You can try again — you have not been charged.`
       : 'The payment was not completed. You can try again — you have not been charged.';
     const updated = updateOrder(order.id, {
       ...transactionDetails,
@@ -553,7 +572,7 @@ async function verifyPaymentForOrder(order, actor, { transactionId } = {}) {
 
   const expiresAt = order.paymentLinkExpiresAt ? Date.parse(order.paymentLinkExpiresAt) : 0;
   if (expiresAt && expiresAt < Date.now()) {
-    const reason = 'The Flutterwave payment session expired. You can start a new payment — you have not been charged.';
+    const reason = 'The ExpressPay checkout session expired. You can start a new payment — you have not been charged.';
     const updated = updateOrder(order.id, {
       ...transactionDetails,
       paymentStatus: 'failed',
@@ -563,13 +582,14 @@ async function verifyPaymentForOrder(order, actor, { transactionId } = {}) {
     return { order: updated, state: 'failed', message: reason };
   }
 
-  // Pending / unknown: Flutterwave has not reached a final state. Record the
-  // check so the UI and reconciler can see progress without changing the outcome.
+  // Pending (result 4) or an unrecognised result: ExpressPay has not reached a
+  // final state. Record the check so the UI and reconciler can see progress
+  // without changing the outcome.
   const updated = updateOrder(order.id, transactionDetails);
   return {
     order: updated,
     state: 'pending',
-    message: 'Waiting for Flutterwave to confirm your payment.',
+    message: 'Waiting for ExpressPay to confirm your payment.',
   };
 }
 
@@ -593,12 +613,12 @@ export async function initiateOrderPayment(req, res) {
         'PAYMENT_NEEDS_ATTENTION'
       );
     }
-    if (!isFlutterwaveConfigured()) {
+    if (!isExpressPayConfigured()) {
       throw httpError(
         503,
         'Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getFlutterwaveConfig().missing }
+        { missing: getExpressPayConfig().missing }
       );
     }
 
@@ -606,10 +626,13 @@ export async function initiateOrderPayment(req, res) {
     const attempts = Number(order.paymentAttempts) || 0;
     const expiresAt = order.paymentLinkExpiresAt ? Date.parse(order.paymentLinkExpiresAt) : 0;
     const liveLink = Boolean(
-      order.paymentStatus === 'processing' && order.paymentLink && (!expiresAt || expiresAt > now)
+      order.paymentStatus === 'processing' &&
+        order.paymentLink &&
+        order.paymentToken &&
+        (!expiresAt || expiresAt > now)
     );
 
-    // Reuse an unexpired checkout link instead of creating a second one.
+    // Reuse an unexpired checkout instead of creating a second one.
     if (liveLink) {
       return res.json({
         success: true,
@@ -617,7 +640,7 @@ export async function initiateOrderPayment(req, res) {
         paymentLink: order.paymentLink,
         state: 'processing',
         reused: true,
-        message: 'Continue your payment on Flutterwave.',
+        message: 'Continue your payment on ExpressPay.',
       });
     }
 
@@ -640,18 +663,18 @@ export async function initiateOrderPayment(req, res) {
       );
     }
 
-    if (!paymentRedirectUrl(order.id)) {
+    if (!paymentReturnUrl(order.id)) {
       throw httpError(
         503,
         'The payment return URL is not configured on this server.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getFlutterwaveConfig().missing }
+        { missing: getExpressPayConfig().missing }
       );
     }
 
     const txRef = newPaymentReference(order.orderNumber);
-    const created = await createPaymentLink({
-      txRef,
+    const created = await createCheckout({
+      orderReference: txRef,
       amountPesewas: order.totalPesewas,
       currency: order.currency || 'GHS',
       customer: {
@@ -665,18 +688,21 @@ export async function initiateOrderPayment(req, res) {
     });
 
     const createdIso = new Date().toISOString();
-    const sessionMs = Math.max(5, Number(getFlutterwaveConfig().sessionMinutes) || 60) * 60 * 1000;
+    const sessionMs = Math.max(5, Number(getExpressPayConfig().sessionMinutes) || 60) * 60 * 1000;
     const previousReferences = Array.isArray(order.paymentReferences) ? order.paymentReferences : [];
+    const previousTokens = Array.isArray(order.paymentTokens) ? order.paymentTokens : [];
     const updated = updateOrder(order.id, {
       paymentStatus: 'processing',
       orderStatus: 'new',
-      paymentProvider: 'flutterwave',
-      paymentChannel: 'flutterwave',
+      paymentProvider: 'expresspay',
+      paymentChannel: 'expresspay',
       paymentMethod: null,
       paymentPhone: order.customerPhone,
       paymentReference: txRef,
       paymentReferences: [...new Set([...previousReferences, txRef])],
-      paymentLink: created.link,
+      paymentToken: created.token,
+      paymentTokens: [...new Set([...previousTokens, created.token])],
+      paymentLink: created.checkoutUrl,
       paymentLinkCreatedAt: createdIso,
       paymentLinkExpiresAt: new Date(now + sessionMs).toISOString(),
       paymentTransactionId: null,
@@ -688,9 +714,9 @@ export async function initiateOrderPayment(req, res) {
     return res.status(201).json({
       success: true,
       order: publicOrder(updated),
-      paymentLink: created.link,
+      paymentLink: created.checkoutUrl,
       state: 'processing',
-      message: 'Redirecting you to Flutterwave to complete payment.',
+      message: 'Redirecting you to ExpressPay to complete payment.',
     });
   } catch (error) {
     return sendError(res, error);
@@ -706,7 +732,7 @@ export async function verifyOrderPayment(req, res) {
     if (order.paymentStatus === 'paid') {
       return res.json({ success: true, order: publicOrder(order), state: 'paid', message: 'Payment confirmed.' });
     }
-    if (!isFlutterwaveConfigured()) {
+    if (!isExpressPayConfigured()) {
       throw httpError(
         503,
         'Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.',
@@ -714,8 +740,8 @@ export async function verifyOrderPayment(req, res) {
       );
     }
 
-    const transactionId = String(req.body?.transactionId || '').trim();
-    const result = await verifyPaymentForOrder(order, 'flutterwave', { transactionId });
+    const token = String(req.body?.token || '').trim();
+    const result = await verifyPaymentForOrder(order, 'expresspay', { token });
     return res.json({
       success: true,
       order: publicOrder(result.order),
@@ -733,17 +759,17 @@ export async function recheckOrderPayment(req, res) {
     if (!order) {
       throw httpError(404, 'Order not found.', 'ORDER_NOT_FOUND');
     }
-    if (!isFlutterwaveConfigured()) {
+    if (!isExpressPayConfigured()) {
       throw httpError(
         503,
-        'Flutterwave is not configured on this server.',
+        'ExpressPay is not configured on this server.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getFlutterwaveConfig().missing }
+        { missing: getExpressPayConfig().missing }
       );
     }
 
-    const transactionId = String(req.body?.transactionId || '').trim();
-    const result = await verifyPaymentForOrder(order, req.adminEmail || 'admin', { transactionId });
+    const token = String(req.body?.token || '').trim();
+    const result = await verifyPaymentForOrder(order, req.adminEmail || 'admin', { token });
     return res.json({
       success: true,
       order: publicOrder(result.order),
@@ -756,57 +782,54 @@ export async function recheckOrderPayment(req, res) {
 }
 
 /**
- * Flutterwave calls this after a charge completes.
- * The payload is treated as a hint only: we look up the order by tx_ref and
- * re-query the transaction verification endpoint before changing anything.
+ * ExpressPay calls this (the `post-url`) after a payment attempt.
+ * The payload is treated as a hint only: it contains just `order-id` and
+ * `token`, and carries no signature. We look up the order, then re-query the
+ * ExpressPay Query API before changing anything.
  */
-export async function handleFlutterwaveWebhook(req, res) {
+export async function handleExpressPayCallback(req, res) {
   try {
-    if (!verifyWebhookSignature(req.get('verif-hash'))) {
-      return res.status(401).json({ success: false, error: 'Invalid webhook signature.' });
-    }
+    const token = String(req.body?.token || req.query?.token || '').trim();
+    const reference = String(
+      req.body?.['order-id'] || req.body?.orderId || req.query?.['order-id'] || ''
+    ).trim();
 
-    const event = String(req.body?.event || '').trim();
-    const data = req.body?.data && typeof req.body.data === 'object' ? req.body.data : {};
-    if (event !== 'charge.completed') {
+    if (!token && !reference) {
       return res.json({ success: true, ignored: true });
     }
 
-    const txRef = String(data.tx_ref || '').trim();
-    const transactionId = data.id != null ? String(data.id) : '';
-    if (!txRef) {
-      return res.json({ success: true, ignored: true });
-    }
-
-    const order = getOrderByReference(txRef);
+    const order = (token ? getOrderByPaymentToken(token) : null) || (reference ? getOrderByReference(reference) : null);
     if (!order) {
-      // Unknown reference: acknowledge so Flutterwave does not keep retrying.
+      // Unknown reference: acknowledge so ExpressPay does not keep retrying.
       return res.json({ success: true, ignored: true });
     }
     if (order.paymentStatus === 'paid') {
       return res.json({ success: true, alreadyPaid: true });
     }
 
-    const result = await verifyPaymentForOrder(order, 'flutterwave-webhook', { transactionId });
-    console.log(`Flutterwave webhook for ${order.orderNumber}: ${result.state}`);
+    // Only query with a token we know belongs to this order; otherwise fall
+    // back to the order's own latest token.
+    const usableToken = token && paymentTokenMatches(order, token) ? token : undefined;
+    const result = await verifyPaymentForOrder(order, 'expresspay-callback', { token: usableToken });
+    console.log(`ExpressPay callback for ${order.orderNumber}: ${result.state}`);
     return res.json({ success: true, state: result.state, alreadyPaid: result.state === 'paid' });
   } catch (error) {
-    // Always acknowledge callbacks we cannot process; Flutterwave retries
-    // aggressively and the reconciler will catch up independently.
-    console.error('Flutterwave webhook error:', error);
+    // Always acknowledge callbacks we cannot process; ExpressPay retries and
+    // the reconciler / page poll will catch up independently.
+    console.error('ExpressPay callback error:', error);
     return res.json({ success: true, ignored: true });
   }
 }
 
 /**
- * Reconciles live payments that have not received a usable webhook.
- * Safe to call repeatedly and from a timer; it never creates a payment link
- * and never marks an order paid without a fresh Flutterwave verification.
+ * Reconciles live payments that have not received a usable callback.
+ * Safe to call repeatedly and from a timer; it never creates a checkout
+ * and never marks an order paid without a fresh ExpressPay query.
  */
 let reconciling = false;
 export async function reconcilePendingPayments({ maxAgeMs = 24 * 60 * 60 * 1000, limit = 25 } = {}) {
   if (reconciling) return { checked: 0, skipped: true };
-  if (!isFlutterwaveConfigured()) return { checked: 0, skipped: true };
+  if (!isExpressPayConfigured()) return { checked: 0, skipped: true };
 
   reconciling = true;
   try {
@@ -816,7 +839,7 @@ export async function reconcilePendingPayments({ maxAgeMs = 24 * 60 * 60 * 1000,
     });
     let checked = 0;
     for (const order of orders) {
-      if (!order.paymentReference) continue;
+      if (!order.paymentToken) continue;
       try {
         await verifyPaymentForOrder(order, 'reconciler');
         checked += 1;

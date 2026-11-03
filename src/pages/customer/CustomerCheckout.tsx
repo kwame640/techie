@@ -251,7 +251,7 @@ export const CustomerCheckout = () => {
         if (!buyNowProductId) clearCart();
       }
 
-      // Ask the server for a Flutterwave hosted-checkout link. The order page
+      // Ask the server for an ExpressPay hosted-checkout link. The order page
       // is the source of truth if anything goes wrong, because a real order
       // always exists by this point.
       let payError: string | null = null;
@@ -267,7 +267,7 @@ export const CustomerCheckout = () => {
         payError =
           payFailure instanceof ApiError
             ? payFailure.message
-            : 'We could not start the Flutterwave checkout. You can try again on the order page.';
+            : 'We could not start the ExpressPay checkout. You can try again on the order page.';
       }
 
       if (paymentLink) {
@@ -519,14 +519,14 @@ export const CustomerCheckout = () => {
                 <h2 className="text-lg font-bold">Payment method</h2>
               </div>
               <p className="text-sm text-[#927f74] mb-6">
-                Pay securely on Flutterwave with mobile money, a debit or credit card, or bank transfer.
-                You will be redirected to Flutterwave to complete payment, then brought back to your order.
+                Pay securely on ExpressPay with mobile money, a debit or credit card, or bank transfer.
+                You will be redirected to ExpressPay to complete payment, then brought back to your order.
               </p>
 
               <div className="rounded-xl border border-[#6f3d27] bg-[#fbf5f1] ring-1 ring-[#6f3d27] p-4 flex items-start gap-3">
                 <CreditCard className="w-5 h-5 text-[#6f3d27] shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-sm">Flutterwave secure checkout</p>
+                  <p className="font-semibold text-sm">ExpressPay secure checkout</p>
                   <p className="text-xs text-[#927f74] mt-0.5">
                     Mobile money · Debit/credit card · Bank transfer
                   </p>
@@ -543,8 +543,8 @@ export const CustomerCheckout = () => {
                 <div className="mt-4 rounded-xl bg-[#f5faf5] border border-[#dcecdd] p-4 text-xs text-[#45704c] flex gap-2">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    NKAY confirms the exact total before Flutterwave opens. Your card or mobile money details
-                    are entered on Flutterwave — never on this page.
+                    NKAY confirms the exact total before ExpressPay opens. Your card or mobile money details
+                    are entered on ExpressPay — never on this page.
                   </span>
                 </div>
               )}
@@ -555,7 +555,7 @@ export const CustomerCheckout = () => {
                   <div>
                     <p className="font-semibold">Payments aren’t set up yet</p>
                     <p className="mt-1">
-                      Flutterwave is not configured on the NKAY server. Please contact NKAY to finish this order.
+                      ExpressPay is not configured on the NKAY server. Please contact NKAY to finish this order.
                     </p>
                   </div>
                 </div>
@@ -585,17 +585,17 @@ export const CustomerCheckout = () => {
               >
                 {processing ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Opening Flutterwave…
+                    <Loader2 className="w-4 h-4 animate-spin" /> Opening ExpressPay…
                   </>
                 ) : (
                   <>
                     <LockKeyhole className="w-4 h-4" />
-                    {quote ? `Pay ${formatGhs(quote.total)} with Flutterwave` : 'Preparing your order…'}
+                    {quote ? `Pay ${formatGhs(quote.total)} with ExpressPay` : 'Preparing your order…'}
                   </>
                 )}
               </button>
               <p className="mt-3 text-center text-[11px] text-[#9a887d] flex items-center justify-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5" /> Stock is only reserved after Flutterwave confirms your payment.
+                <ShieldCheck className="w-3.5 h-3.5" /> Stock is only reserved after ExpressPay confirms your payment.
               </p>
             </section>
           </form>

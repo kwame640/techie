@@ -28,7 +28,7 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
 
 function paymentMethodName(method: string | null | undefined) {
   const value = String(method || '').toLowerCase();
-  if (!value) return 'Flutterwave';
+  if (!value) return 'ExpressPay';
   if (value.includes('mobilemoney') || value.includes('mobile_money')) return 'Mobile money';
   if (value === 'card') return 'Card';
   if (value.includes('bank')) return 'Bank transfer';
@@ -157,15 +157,15 @@ export const AdminOrders = () => {
       );
       setOrders((current) => current.map((item) => (item.id === data.order.id ? data.order : item)));
       if (data.state === 'paid') {
-        setNotice(`Flutterwave confirmed payment for ${order.orderNumber}. Stock has been updated.`);
+        setNotice(`ExpressPay confirmed payment for ${order.orderNumber}. Stock has been updated.`);
       } else if (data.state === 'attention') {
-        setNotice(`Flutterwave confirmed money for ${order.orderNumber}, but the order needs attention. Do not ask the customer to pay again.`);
+        setNotice(`ExpressPay confirmed money for ${order.orderNumber}, but the order needs attention. Do not ask the customer to pay again.`);
       } else if (data.state === 'failed') {
-        setNotice(`Flutterwave reports payment was not completed for ${order.orderNumber}.`);
+        setNotice(`ExpressPay reports payment was not completed for ${order.orderNumber}.`);
       } else if (data.state === 'unavailable') {
-        setNotice(`Flutterwave could not be reached for ${order.orderNumber}. Try again shortly.`);
+        setNotice(data.message || `ExpressPay could not be reached for ${order.orderNumber}. Try again shortly.`);
       } else {
-        setNotice(`Still waiting for Flutterwave to confirm ${order.orderNumber}.`);
+        setNotice(`Still waiting for ExpressPay to confirm ${order.orderNumber}.`);
       }
     } catch (recheckError) {
       setError(recheckError instanceof ApiError ? recheckError.message : 'Could not re-check this payment.');
@@ -194,11 +194,11 @@ export const AdminOrders = () => {
         <div className="p-6 border-b flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-text flex items-center gap-2">
-              <ServerCog className="w-5 h-5 text-primary" /> Flutterwave payments
+              <ServerCog className="w-5 h-5 text-primary" /> ExpressPay payments
             </h2>
             <p className="text-sm text-text-light mt-1">
-              Customers pay on Flutterwave&apos;s hosted checkout. Every payment is verified with Flutterwave on the
-              server before an order is confirmed.
+              Customers pay on ExpressPay&apos;s hosted checkout. Every payment is verified with ExpressPay&apos;s
+              Query API on the server before an order is confirmed.
             </p>
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1.5">
@@ -211,7 +211,7 @@ export const AdminOrders = () => {
             </span>
             {settings?.enabled && (
               <span className="text-[11px] font-semibold text-text-light uppercase tracking-wide">
-                {settings.mode === 'live' ? 'Live keys' : settings.mode === 'test' ? 'Test keys' : 'Unknown mode'}
+                {settings.mode === 'live' ? 'Live keys' : 'Sandbox keys'}
               </span>
             )}
           </div>
@@ -230,7 +230,7 @@ export const AdminOrders = () => {
                 <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800 flex gap-2">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    Checkout is collecting card, mobile money and bank payments through Flutterwave. API keys stay on
+                    Checkout is collecting card, mobile money and bank payments through ExpressPay. Credentials stay on
                     the server.
                   </span>
                 </div>
@@ -238,7 +238,7 @@ export const AdminOrders = () => {
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 flex gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold">Checkout is disabled until Flutterwave is configured</p>
+                    <p className="font-semibold">Checkout is disabled until ExpressPay is configured</p>
                     <p className="mt-1">
                       Set these environment variables on the server, then restart it:{' '}
                       <span className="font-semibold">
@@ -250,15 +250,29 @@ export const AdminOrders = () => {
                 </div>
               )}
 
-              {!settings.webhookSecure && (
+              {!settings.callbackConfigured && (
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 flex gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold">Webhooks are not ready</p>
+                    <p className="font-semibold">The ExpressPay callback is not ready</p>
                     <p className="mt-1">
-                      Set a public HTTPS <span className="font-semibold">PUBLIC_SERVER_URL</span> and the{' '}
-                      <span className="font-semibold">FLW_WEBHOOK_SECRET_HASH</span> from your Flutterwave dashboard.
-                      Without them, payments are still confirmed by the automatic re-check but slower.
+                      Set a public HTTPS <span className="font-semibold">PUBLIC_SERVER_URL</span> and register the
+                      callback URL with ExpressPay. Without it, payments are still confirmed by the automatic
+                      re-check, but more slowly.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {settings.ipAllowlistRequired && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 flex gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">ExpressPay may block this server&apos;s IP</p>
+                    <p className="mt-1">
+                      ExpressPay returns <span className="font-semibold">status 4 / Invalid IP</span> for servers that
+                      are not allowlisted. Ask ExpressPay to allow this deployment&apos;s egress IPs (Vercel IPs are
+                      dynamic) or route ExpressPay API calls through a fixed-IP proxy.
                     </p>
                   </div>
                 </div>
@@ -266,30 +280,28 @@ export const AdminOrders = () => {
 
               <div className="grid sm:grid-cols-2 gap-4 text-sm">
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Webhook URL</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Callback (post-url)</p>
                   <p className="mt-1 break-all font-medium text-text">
-                    {settings.webhookUrl || 'Not set — add PUBLIC_SERVER_URL'}
+                    {settings.callbackUrl || 'Not set — add PUBLIC_SERVER_URL'}
                   </p>
                   <p className="text-xs text-text-light mt-1">
-                    {settings.webhookSecure
-                      ? 'Public HTTPS endpoint. Paste this URL into the Flutterwave dashboard webhook settings.'
-                      : 'Must be a public HTTPS URL for Flutterwave to deliver webhooks.'}
+                    {settings.callbackSecure
+                      ? 'Public HTTPS endpoint. Register this URL with ExpressPay for payment notifications.'
+                      : 'Must be a public HTTPS URL for ExpressPay to deliver the callback.'}
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-200 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Credentials</p>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    <ConfigFlag ok={settings.secretKeySet} label={settings.secretKeySet ? 'Secret key set' : 'Secret key missing'} />
-                    <ConfigFlag ok={settings.publicKeySet} label={settings.publicKeySet ? 'Public key set' : 'Public key missing'} />
                     <ConfigFlag
-                      ok={settings.webhookSecretSet}
-                      label={settings.webhookSecretSet ? 'Webhook hash set' : 'Webhook hash missing'}
+                      ok={settings.merchantIdSet}
+                      label={settings.merchantIdSet ? 'Merchant ID set' : 'Merchant ID missing'}
                     />
+                    <ConfigFlag ok={settings.apiKeySet} label={settings.apiKeySet ? 'API key set' : 'API key missing'} />
                   </div>
                   <p className="text-xs text-text-light mt-1">
-                    Keys are read from <span className="font-semibold">FLW_SECRET_KEY</span>,{' '}
-                    <span className="font-semibold">FLW_PUBLIC_KEY</span> and{' '}
-                    <span className="font-semibold">FLW_WEBHOOK_SECRET_HASH</span>.
+                    Keys are read from <span className="font-semibold">EXPAY_MERCHANT_ID</span> and{' '}
+                    <span className="font-semibold">EXPAY_API_KEY</span>.
                   </p>
                 </div>
               </div>
@@ -298,24 +310,24 @@ export const AdminOrders = () => {
                 <div className="rounded-xl border border-gray-200 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Checkout return URL</p>
                   <p className="mt-1 break-all font-medium text-text">
-                    {settings.redirectUrlPattern || 'Not set — add PUBLIC_APP_URL'}
+                    {settings.returnUrlPattern || 'Not set — add PUBLIC_APP_URL'}
                   </p>
                   <p className="text-xs text-text-light mt-1">
-                    Flutterwave sends the customer back here after payment.
+                    ExpressPay sends the customer back here after payment.
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-200 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Checkout session</p>
                   <p className="mt-1 font-medium text-text">{settings.sessionMinutes} minutes</p>
                   <p className="text-xs text-text-light mt-1">
-                    Unpaid links expire after this window and can be re-issued from the order page.
+                    Unpaid checkouts expire after this window and can be re-issued from the order page.
                   </p>
                 </div>
               </div>
 
               <p className="text-xs text-text-light">
-                Payments without a webhook are re-checked automatically every minute while this server runs. You can
-                also re-check any order below.
+                Payments are re-checked automatically every minute while this server runs. You can also re-check any
+                order below.
               </p>
             </div>
           ) : null}
@@ -330,7 +342,7 @@ export const AdminOrders = () => {
                 <Package className="w-5 h-5 text-primary" /> Orders &amp; payments
               </h2>
               <p className="text-sm text-text-light mt-1">
-                Flutterwave confirms payments automatically. Re-check any order to ask Flutterwave for the latest
+                ExpressPay confirms payments automatically. Re-check any order to ask ExpressPay for the latest
                 status.
               </p>
             </div>
@@ -432,7 +444,7 @@ export const AdminOrders = () => {
                         <p>
                           Method:{' '}
                           <span className="font-semibold">
-                            {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'Flutterwave checkout'}
+                            {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'ExpressPay checkout'}
                           </span>
                         </p>
                         <p>
@@ -440,7 +452,7 @@ export const AdminOrders = () => {
                         </p>
                         {order.paymentTransactionId && (
                           <p>
-                            Flutterwave ID:{' '}
+                            ExpressPay ID:{' '}
                             <span className="font-semibold break-all">{order.paymentTransactionId}</span>
                           </p>
                         )}
@@ -458,7 +470,7 @@ export const AdminOrders = () => {
                       {order.paymentStatus === 'paid' && order.paymentVerifiedAt && (
                         <p className="mt-2 text-[11px] text-green-700 flex items-center gap-1">
                           <ShieldCheck className="w-3 h-3" />
-                          Confirmed by Flutterwave {when(order.paymentVerifiedAt)}
+                          Confirmed by ExpressPay {when(order.paymentVerifiedAt)}
                         </p>
                       )}
                       {order.failureReason && order.paymentStatus !== 'paid' && (
@@ -475,7 +487,7 @@ export const AdminOrders = () => {
                         className="inline-flex items-center gap-2 rounded-lg border border-[#e0d3ca] bg-white px-3.5 py-2 text-xs font-semibold text-[#6f3d27] hover:bg-[#fbf5f1] transition disabled:opacity-40"
                       >
                         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                        Re-check with Flutterwave
+                        Re-check with ExpressPay
                       </button>
                       {order.paymentStatus === 'attention' && (
                         <span className="text-[11px] text-red-600">
