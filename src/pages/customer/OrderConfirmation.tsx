@@ -5,6 +5,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
+  CreditCard,
+  ExternalLink,
   Loader2,
   MapPin,
   Package,
@@ -12,7 +14,6 @@ import {
   RefreshCw,
   ShieldCheck,
   ShoppingBag,
-  Smartphone,
   Store,
   Truck,
 } from 'lucide-react';
@@ -24,40 +25,23 @@ type LoadState = 'loading' | 'ready' | 'error';
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLLS = 60;
-const PROMPT_EXPIRY_MS = 150 * 1000;
 
-const WALLETS = [
-  { id: 'MTN', name: 'MTN MoMo', short: 'MTN', className: 'bg-[#ffcc00] text-[#1a1a1a]' },
-  { id: 'Telecel', name: 'Telecel Cash', short: 'T', className: 'bg-[#e60000] text-white' },
-  { id: 'AT', name: 'AT Money', short: 'AT', className: 'bg-[#0a5bd3] text-white' },
-];
-
-const inputClass =
-  'mt-1.5 w-full h-11 rounded-xl border border-[#e7ddd7] bg-white px-3 text-sm outline-none transition focus:border-[#6f3d27] focus:ring-2 focus:ring-[#6f3d27]/10';
-const labelClass = 'block text-xs font-semibold text-[#4e362a]';
-
-function walletName(id: string | null | undefined) {
-  return WALLETS.find((wallet) => wallet.id === id)?.name || id || 'Mobile money';
+function paymentMethodName(method: string | null | undefined) {
+  const value = String(method || '').toLowerCase();
+  if (!value) return 'Flutterwave';
+  if (value.includes('mobilemoney') || value.includes('mobile_money')) return 'Mobile money';
+  if (value === 'card') return 'Card';
+  if (value.includes('bank')) return 'Bank transfer';
+  if (value === 'ussd') return 'USSD';
+  return value.replace(/[_-]+/g, ' ');
 }
 
-function isValidGhanaPhone(value: string) {
-  const digits = String(value || '').replace(/\D/g, '');
-  return /^0\d{9}$/.test(digits) || /^233\d{9}$/.test(digits);
-}
-
-function formatPhone(value: string | null | undefined) {
-  const digits = String(value || '').replace(/\D/g, '');
-  if (/^0\d{9}$/.test(digits)) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-  if (/^233\d{9}$/.test(digits)) return `0${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`;
-  return value || '';
-}
-
-function statusMeta(order: OrderView, promptExpired: boolean) {
+function statusMeta(order: OrderView, linkExpired: boolean) {
   if (order.paymentStatus === 'paid') {
     return {
       tone: 'paid' as const,
       title: 'Payment confirmed',
-      message: 'Hubtel confirmed your mobile money payment. The seller is preparing your order.',
+      message: 'Flutterwave confirmed your payment. The seller is preparing your order.',
       Icon: CheckCircle2,
     };
   }
@@ -72,19 +56,20 @@ function statusMeta(order: OrderView, promptExpired: boolean) {
     };
   }
   if (order.paymentStatus === 'processing') {
-    return promptExpired
+    return linkExpired
       ? {
           tone: 'pending' as const,
-          title: 'Prompt not approved yet',
+          title: 'Payment session expired',
           message:
-            'The mobile money prompt was not approved in time. If it is still on your phone, approve it — otherwise send a new prompt.',
+            'The Flutterwave checkout session ended. If you were not charged, you can start a new payment below.',
           Icon: Clock,
         }
       : {
           tone: 'processing' as const,
-          title: 'Approve the prompt on your phone',
-          message: `We sent a ${walletName(order.paymentProvider)} prompt to ${formatPhone(order.paymentPhone)}. Enter your PIN on your handset to approve it.`,
-          Icon: Smartphone,
+          title: 'Complete your payment on Flutterwave',
+          message:
+            'Finish your payment on the secure Flutterwave page. This page updates automatically once it is confirmed.',
+          Icon: CreditCard,
         };
   }
   if (order.paymentStatus === 'failed') {
@@ -93,22 +78,24 @@ function statusMeta(order: OrderView, promptExpired: boolean) {
       title: 'Payment not confirmed',
       message:
         order.failureReason ||
-        'The mobile money payment was not completed. You can try again — you have not been charged.',
+        'The payment was not completed. You can try again — you have not been charged.',
       Icon: AlertCircle,
     };
   }
   return {
     tone: 'pending' as const,
     title: 'Complete your payment',
-    message: 'Choose your wallet and send a payment prompt to your phone. Your order is confirmed after you approve it.',
-    Icon: Smartphone,
+    message:
+      'Pay securely with Flutterwave using mobile money, a card or bank transfer. Your order is confirmed after payment is verified.',
+    Icon: CreditCard,
   };
 }
 
 export const OrderConfirmation = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
-  const routeState = (location.state as { provider?: string; payError?: string } | null) || null;
+  const routeState = (location.state as { payError?: string } | null) || null;
+  const returnedTransactionId = new URLSearchParams(location.search).get('transaction_id') || '';
 
   const [order, setOrder] = useState<OrderView | null>(null);
   const [settings, setSettings] = useState<PaymentSettings | null>(null);
@@ -118,17 +105,11 @@ export const OrderConfirmation = () => {
   const [checking, setChecking] = useState(false);
   const [pollCount, setPollCount] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-
-  const [provider, setProvider] = useState(() => {
-    const value = routeState?.provider;
-    return WALLETS.some((wallet) => wallet.id === value) ? (value as string) : 'MTN';
-  });
-  const [walletPhone, setWalletPhone] = useState('');
   const [starting, setStarting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(routeState?.payError || null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const pollTimerRef = useRef<number | null>(null);
+  const redirectCheckedRef = useRef(false);
 
   const loadOrder = useCallback(async () => {
     if (!orderId) throw new Error('Missing order id.');
@@ -137,6 +118,13 @@ export const OrderConfirmation = () => {
     rememberOrderId(data.order.id);
     return data.order;
   }, [orderId]);
+
+  const applyResult = useCallback((result: PaymentVerificationResult) => {
+    setOrder(result.order);
+    if (result.message) setStatusMessage(result.message);
+    setPollCount(0);
+    if (result.state === 'paid' || result.state === 'attention') setActionError(null);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,11 +135,9 @@ export const OrderConfirmation = () => {
       loadOrder(),
       apiRequest<{ settings: PaymentSettings }>('/api/payments/settings').catch(() => null),
     ])
-      .then(([loaded, settingsResponse]) => {
+      .then(([, settingsResponse]) => {
         if (cancelled) return;
         if (settingsResponse) setSettings(settingsResponse.settings);
-        setProvider((current) => loaded.paymentProvider || current);
-        setWalletPhone((current) => current || loaded.paymentPhone || loaded.customer.phone);
         setState('ready');
       })
       .catch((loadError) => {
@@ -165,23 +151,43 @@ export const OrderConfirmation = () => {
     };
   }, [loadOrder]);
 
-  // Refresh the "expired prompt" clock while a prompt is outstanding.
+  // Refresh the checkout-expiry clock while a payment is outstanding.
   useEffect(() => {
     if (order?.paymentStatus !== 'processing') return;
     const timer = window.setInterval(() => setNow(Date.now()), 10000);
     return () => window.clearInterval(timer);
   }, [order?.paymentStatus]);
 
-  const promptedAt = order?.paymentPromptedAt ? Date.parse(order.paymentPromptedAt) : 0;
-  const promptExpired = Boolean(
-    order?.paymentStatus === 'processing' && promptedAt && now - promptedAt > PROMPT_EXPIRY_MS
+  const linkExpiresAt = order?.paymentLinkExpiresAt ? Date.parse(order.paymentLinkExpiresAt) : 0;
+  const linkExpired = Boolean(
+    order?.paymentStatus === 'processing' && linkExpiresAt && now > linkExpiresAt
   );
 
-  // While a prompt is live, ask the server to re-check with Hubtel. The
-  // browser never decides that a payment succeeded.
+  // When Flutterwave redirects back it adds ?transaction_id=... . Verify that
+  // exact transaction once; the server still asks Flutterwave for the truth.
+  useEffect(() => {
+    if (!order || !returnedTransactionId || redirectCheckedRef.current) return;
+    if (order.paymentStatus === 'paid' || order.paymentStatus === 'attention') return;
+    redirectCheckedRef.current = true;
+
+    apiRequest<PaymentVerificationResult>(
+      `/api/orders/${encodeURIComponent(order.id)}/payment/verify`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ transactionId: returnedTransactionId }),
+      }
+    )
+      .then(applyResult)
+      .catch(() => {
+        setStatusMessage('We could not confirm the payment yet. Tap “Check status” in a moment.');
+      });
+  }, [order, returnedTransactionId, applyResult]);
+
+  // While payment is in progress, ask the server to re-check with Flutterwave.
+  // The browser never decides that a payment succeeded.
   useEffect(() => {
     if (!order || order.paymentStatus !== 'processing') return;
-    if (promptExpired || pollCount >= MAX_POLLS) return;
+    if (pollCount >= MAX_POLLS) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
       setPollCount((count) => count + 1);
@@ -200,14 +206,7 @@ export const OrderConfirmation = () => {
     return () => {
       if (pollTimerRef.current) window.clearTimeout(pollTimerRef.current);
     };
-  }, [order, pollCount, promptExpired]);
-
-  const applyResult = (result: PaymentVerificationResult) => {
-    setOrder(result.order);
-    if (result.message) setStatusMessage(result.message);
-    setPollCount(0);
-    if (result.state === 'paid' || result.state === 'attention') setActionError(null);
-  };
+  }, [order, pollCount]);
 
   const verifyNow = async () => {
     if (!order) return;
@@ -216,7 +215,10 @@ export const OrderConfirmation = () => {
     try {
       const result = await apiRequest<PaymentVerificationResult>(
         `/api/orders/${encodeURIComponent(order.id)}/payment/verify`,
-        { method: 'POST' }
+        {
+          method: 'POST',
+          body: JSON.stringify(returnedTransactionId ? { transactionId: returnedTransactionId } : {}),
+        }
       );
       applyResult(result);
     } catch (verifyError) {
@@ -228,40 +230,38 @@ export const OrderConfirmation = () => {
     }
   };
 
-  const sendPrompt = async () => {
+  const startPayment = async () => {
     if (!order) return;
     setActionError(null);
     setStatusMessage(null);
-
-    if (!isValidGhanaPhone(walletPhone)) {
-      setFieldErrors({ phone: 'Enter the mobile money number that will receive the prompt.' });
-      return;
-    }
-    setFieldErrors({});
     setStarting(true);
     try {
-      const result = await apiRequest<{ order: OrderView; message?: string }>(
+      const result = await apiRequest<{ order: OrderView; paymentLink?: string; message?: string }>(
         `/api/orders/${encodeURIComponent(order.id)}/pay`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ provider, phone: walletPhone.trim() }),
-        }
+        { method: 'POST' }
       );
       setOrder(result.order);
-      setNow(Date.now());
       setPollCount(0);
-      if (result.message) setStatusMessage(result.message);
-    } catch (sendError) {
-      if (sendError instanceof ApiError) {
-        setActionError(sendError.message);
-        const failedOrder = (sendError.payload as { order?: OrderView } | undefined)?.order;
-        if (failedOrder) setOrder(failedOrder);
-        if (sendError.details) setFieldErrors(sendError.details);
-      } else {
-        setActionError('We could not send the payment prompt. Please try again.');
+      setNow(Date.now());
+
+      const paymentLink = result.paymentLink || result.order.paymentLink;
+      if (paymentLink) {
+        window.location.assign(paymentLink);
+        return;
       }
-    } finally {
+
       setStarting(false);
+      setStatusMessage(result.message || 'Flutterwave did not return a checkout link. Please try again.');
+    } catch (payError) {
+      setStarting(false);
+      setActionError(
+        payError instanceof ApiError
+          ? payError.message
+          : 'We could not start the Flutterwave checkout. Please try again.'
+      );
+      // Reflect whatever the server now knows (e.g. attention or a link that
+      // was just created) instead of leaving a stale order on screen.
+      loadOrder().catch(() => {});
     }
   };
 
@@ -294,10 +294,10 @@ export const OrderConfirmation = () => {
     );
   }
 
-  const meta = statusMeta(order, promptExpired);
+  const meta = statusMeta(order, linkExpired);
   const StatusIcon = meta.Icon;
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
-  const canStartPayment = order.paymentStatus === 'pending' || order.paymentStatus === 'failed';
+  const canPay = order.paymentStatus === 'pending' || order.paymentStatus === 'failed' || linkExpired;
   const reference = order.paymentReference || order.orderNumber;
   const paymentsEnabled = settings?.enabled !== false;
   const toneClasses = {
@@ -310,7 +310,7 @@ export const OrderConfirmation = () => {
 
   const badge = {
     paid: { label: 'Paid', className: 'bg-green-100 text-green-700' },
-    processing: { label: 'Approve prompt', className: 'bg-blue-100 text-blue-700' },
+    processing: { label: 'Pay on Flutterwave', className: 'bg-blue-100 text-blue-700' },
     failed: { label: 'Not confirmed', className: 'bg-red-100 text-red-700' },
     attention: { label: 'Needs attention', className: 'bg-red-100 text-red-700' },
     pending: { label: 'Awaiting payment', className: 'bg-amber-100 text-amber-700' },
@@ -335,7 +335,7 @@ export const OrderConfirmation = () => {
           <div className="min-w-0">
             <h1 className={`text-xl sm:text-2xl font-bold ${toneClasses.title}`}>{meta.title}</h1>
             <p className="text-sm mt-1 text-[#5f5148]">{meta.message}</p>
-            {order.paymentStatus === 'processing' && !promptExpired && (
+            {order.paymentStatus === 'processing' && !linkExpired && (
               <p className="text-xs mt-2 text-blue-700 flex items-center gap-1.5">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 {pollCount >= MAX_POLLS
@@ -407,79 +407,53 @@ export const OrderConfirmation = () => {
               </div>
             </div>
 
-            {(canStartPayment || order.paymentStatus === 'processing') && (
+            {(canPay || order.paymentStatus === 'processing' || order.paymentStatus === 'attention') && (
               <div className="mt-5 rounded-2xl border border-[#eee5df] bg-[#fcfaf9] p-4 sm:p-5">
                 <h3 className="text-sm font-bold flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-[#6f3d27]" /> {walletName(provider)} payment
+                  <CreditCard className="w-4 h-4 text-[#6f3d27]" /> Flutterwave secure checkout
                 </h3>
 
                 {!paymentsEnabled && (
                   <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 flex gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                     <span>
-                      Mobile money payments are not configured on the NKAY server. Contact NKAY with order{' '}
+                      Card and mobile money payments are not configured on the NKAY server. Contact NKAY with order{' '}
                       {order.orderNumber}.
                     </span>
                   </div>
                 )}
 
-                {paymentsEnabled && order.paymentStatus === 'processing' && (
+                {paymentsEnabled && order.paymentStatus === 'processing' && !linkExpired && (
                   <div className="mt-3 space-y-3">
                     <div className="rounded-xl border border-blue-200 bg-white p-4">
                       <p className="text-sm text-[#5f5148]">
-                        Approve the <span className="font-semibold">{formatGhs(order.total)}</span> prompt sent to{' '}
-                        <span className="font-semibold">{formatPhone(order.paymentPhone)}</span> on{' '}
-                        {walletName(order.paymentProvider)}.
+                        Your <span className="font-semibold">{formatGhs(order.total)}</span> payment is waiting on
+                        Flutterwave. Finish it there and this page will confirm automatically.
                       </p>
                       <p className="text-xs text-[#927f74] mt-2">
-                        Enter your MoMo PIN on your handset. Never share your PIN with anyone, including NKAY.
+                        Enter your mobile money PIN, card details or bank login only on the Flutterwave page. NKAY never
+                        asks for them.
                       </p>
+                      {order.paymentLinkExpiresAt && (
+                        <p className="text-xs text-[#927f74] mt-2 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          Checkout closes{' '}
+                          {new Date(order.paymentLinkExpiresAt).toLocaleTimeString('en-GH', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                          .
+                        </p>
+                      )}
                     </div>
 
-                    {promptExpired && (
-                      <>
-                        <p className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
-                          This prompt was not approved in time. If it is still on your phone you can approve it.
-                          Otherwise send a new prompt below — you are only charged once.
-                        </p>
-                        <div className="grid grid-cols-3 gap-2">
-                          {WALLETS.map((wallet) => (
-                            <button
-                              key={wallet.id}
-                              type="button"
-                              onClick={() => setProvider(wallet.id)}
-                              className={`rounded-xl border p-2 text-center transition ${
-                                provider === wallet.id
-                                  ? 'border-[#6f3d27] ring-1 ring-[#6f3d27] bg-white'
-                                  : 'border-[#e7ddd7] bg-white hover:border-[#c9b3a7]'
-                              }`}
-                            >
-                              <span
-                                className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${wallet.className}`}
-                              >
-                                {wallet.short}
-                              </span>
-                              <span className="mt-1 block text-[10px] font-medium text-[#4e362a]">{wallet.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={sendPrompt}
-                          disabled={starting}
-                          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#6f3d27] px-4 py-3 text-sm font-semibold text-white hover:bg-[#5d3524] transition disabled:opacity-60"
-                        >
-                          {starting ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" /> Sending prompt…
-                            </>
-                          ) : (
-                            <>
-                              <Smartphone className="w-4 h-4" /> Send prompt again
-                            </>
-                          )}
-                        </button>
-                      </>
+                    {order.paymentLink && (
+                      <a
+                        href={order.paymentLink}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#6f3d27] px-4 py-3 text-sm font-semibold text-white hover:bg-[#5d3524] transition"
+                      >
+                        <ExternalLink className="w-4 h-4" /> Continue to Flutterwave
+                      </a>
                     )}
 
                     <button
@@ -489,79 +463,45 @@ export const OrderConfirmation = () => {
                       className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-[#e0d3ca] bg-white px-4 py-2.5 text-sm font-semibold text-[#6f3d27] hover:bg-[#fbf5f1] transition disabled:opacity-60"
                     >
                       {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                      I have approved it — check status
+                      I have paid — check status
                     </button>
                   </div>
                 )}
 
-                {paymentsEnabled && canStartPayment && (
+                {paymentsEnabled && canPay && (
                   <div className="mt-3">
-                    <div>
-                      <span className={labelClass}>Wallet</span>
-                      <div className="grid grid-cols-3 gap-2 mt-1.5">
-                        {WALLETS.map((wallet) => (
-                          <button
-                            key={wallet.id}
-                            type="button"
-                            onClick={() => setProvider(wallet.id)}
-                            className={`rounded-xl border p-2 text-center transition ${
-                              provider === wallet.id
-                                ? 'border-[#6f3d27] ring-1 ring-[#6f3d27] bg-white'
-                                : 'border-[#e7ddd7] bg-white hover:border-[#c9b3a7]'
-                            }`}
-                          >
-                            <span
-                              className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${wallet.className}`}
-                            >
-                              {wallet.short}
-                            </span>
-                            <span className="mt-1 block text-[10px] font-medium text-[#4e362a]">{wallet.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <label className={`${labelClass} mt-3`} htmlFor="wallet-phone">
-                      Mobile money number
-                    </label>
-                    <input
-                      id="wallet-phone"
-                      value={walletPhone}
-                      onChange={(event) => {
-                        setWalletPhone(event.target.value);
-                        setFieldErrors((current) => ({ ...current, phone: '' }));
-                      }}
-                      placeholder="055 123 4567"
-                      className={inputClass}
-                      inputMode="tel"
-                      autoComplete="tel"
-                    />
-                    {fieldErrors.phone && <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>}
-
                     {order.paymentStatus === 'failed' && order.failureReason && (
-                      <p className="mt-3 rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-700">
+                      <p className="mb-3 rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-700">
                         {order.failureReason}
+                      </p>
+                    )}
+
+                    {linkExpired && (
+                      <p className="mb-3 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
+                        The Flutterwave checkout session expired. If you were not charged, you can start a new payment
+                        below.
                       </p>
                     )}
 
                     <button
                       type="button"
-                      onClick={sendPrompt}
+                      onClick={startPayment}
                       disabled={starting}
-                      className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#6f3d27] px-4 py-3 text-sm font-semibold text-white hover:bg-[#5d3524] transition disabled:opacity-60"
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#6f3d27] px-4 py-3 text-sm font-semibold text-white hover:bg-[#5d3524] transition disabled:opacity-60"
                     >
                       {starting ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" /> Sending prompt…
+                          <Loader2 className="w-4 h-4 animate-spin" /> Opening Flutterwave…
                         </>
                       ) : (
                         <>
-                          <Smartphone className="w-4 h-4" /> Send {formatGhs(order.total)} payment prompt
+                          <CreditCard className="w-4 h-4" /> Pay {formatGhs(order.total)} with Flutterwave
                         </>
                       )}
                     </button>
                     <p className="mt-2 text-center text-[11px] text-[#9a887d]">
-                      Approve the prompt on your phone. Do not send money to anyone directly.
+                      You will be redirected to Flutterwave. Mobile money, debit/credit card and bank transfer are
+                      accepted.
                     </p>
                   </div>
                 )}
@@ -572,7 +512,8 @@ export const OrderConfirmation = () => {
                     <p className="mt-1">{order.failureReason}</p>
                     {order.amountPaid != null && (
                       <p className="mt-1 text-xs">
-                        Amount Hubtel confirmed: <span className="font-semibold">{formatGhs(order.amountPaid)}</span>
+                        Amount Flutterwave confirmed:{' '}
+                        <span className="font-semibold">{formatGhs(order.amountPaid)}</span>
                       </p>
                     )}
                   </div>
@@ -641,13 +582,12 @@ export const OrderConfirmation = () => {
               <h2 className="text-sm font-bold">Payment</h2>
               <div className="mt-2 space-y-1.5 text-sm text-[#806e64]">
                 <p className="flex items-center gap-2">
-                  <Smartphone className="w-4 h-4" />
-                  {order.paymentProvider ? walletName(order.paymentProvider) : 'Mobile money'}
+                  <CreditCard className="w-4 h-4" />
+                  {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'Flutterwave'}
                 </p>
-                {order.paymentPhone && <p className="text-xs">Wallet: {formatPhone(order.paymentPhone)}</p>}
                 <p className="text-xs break-all">Reference: {reference}</p>
-                {order.hubtelTransactionId && (
-                  <p className="text-xs break-all">Hubtel ID: {order.hubtelTransactionId}</p>
+                {order.paymentTransactionId && (
+                  <p className="text-xs break-all">Flutterwave ID: {order.paymentTransactionId}</p>
                 )}
                 {order.amountPaid != null && order.paymentStatus !== 'failed' && (
                   <p className="text-xs">
@@ -664,14 +604,14 @@ export const OrderConfirmation = () => {
               {order.paymentStatus === 'paid' && (
                 <p className="mt-3 rounded-lg bg-[#f5faf5] p-2.5 text-[11px] text-[#45704c] flex gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  Payment confirmed by Hubtel. Keep your order number for support.
+                  Payment verified with Flutterwave. Keep your order number for support.
                 </p>
               )}
 
               {order.paymentStatus === 'processing' && (
                 <p className="mt-3 rounded-lg bg-blue-50 p-2.5 text-[11px] text-blue-800 flex gap-1.5">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
-                  Your order is confirmed automatically once you approve the prompt.
+                  This order is confirmed automatically once Flutterwave verifies your payment.
                 </p>
               )}
 

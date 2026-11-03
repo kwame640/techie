@@ -53,8 +53,8 @@ export function createOrder(order) {
   const record = {
     ...order,
     orderNumber,
-    // The order number doubles as Hubtel's client reference. It is unique,
-    // stable for the life of the order, and well inside Hubtel's 32 char limit.
+    // The order number is the initial payment reference. Flutterwave gets a
+    // unique tx_ref per checkout attempt, which is stored when payment starts.
     paymentReference: order.paymentReference || orderNumber,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

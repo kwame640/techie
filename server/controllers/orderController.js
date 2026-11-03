@@ -10,26 +10,26 @@ import {
   newOrderId,
 } from '../models/orderModel.js';
 import {
-  adminHubtelSettings,
-  checkMobileMoneyStatus,
-  callbackReference,
-  getHubtelConfig,
-  initiateMobileMoneyPayment,
-  isHubtelConfigured,
-  providerById,
-  publicHubtelSettings,
-  toLocalMsisdn,
-} from '../services/hubtelService.js';
+  adminFlutterwaveSettings,
+  createPaymentLink,
+  getFlutterwaveConfig,
+  isFlutterwaveConfigured,
+  paymentRedirectUrl,
+  publicFlutterwaveSettings,
+  verifyTransactionById,
+  verifyTransactionByReference,
+  verifyWebhookSignature,
+} from '../services/flutterwaveService.js';
+import { randomBytes } from 'crypto';
 
 const MAX_ITEMS = 20;
 const MAX_QUANTITY = 99;
 
-// A wallet prompt usually lives for about two minutes. We never send a second
-// prompt while Hubtel still reports the first one as outstanding, and we never
-// send prompts closer together than this even after a definitive failure.
-const PROMPT_RETRY_MS = 150 * 1000;
-const PROMPT_MIN_INTERVAL_MS = 20 * 1000;
+// A hosted Flutterwave payment link lives for FLW_SESSION_MINUTES (60 by
+// default). We reuse the live link instead of creating a new one, and never
+// create more than this many links for a single order.
 const MAX_PAYMENT_ATTEMPTS = 5;
+const PAYMENT_LINK_MIN_INTERVAL_MS = 20 * 1000;
 
 function httpError(status, message, code, details) {
   const error = new Error(message);
@@ -212,10 +212,13 @@ export function publicOrder(order) {
     paymentStatus: order.paymentStatus,
     paymentChannel: order.paymentChannel || null,
     paymentProvider: order.paymentProvider || null,
+    paymentMethod: order.paymentMethod || null,
     paymentPhone: order.paymentPhone || null,
     paymentReference: order.paymentReference || order.orderNumber || null,
-    hubtelTransactionId: order.hubtelTransactionId || null,
-    paymentPromptedAt: order.paymentPromptedAt || null,
+    paymentLink: order.paymentLink || null,
+    paymentLinkCreatedAt: order.paymentLinkCreatedAt || null,
+    paymentLinkExpiresAt: order.paymentLinkExpiresAt || null,
+    paymentTransactionId: order.paymentTransactionId || null,
     paymentCheckedAt: order.paymentCheckedAt || null,
     paymentAttempts: Number(order.paymentAttempts) || 0,
     amountPaid: order.amountPaidPesewas ? toGhs(order.amountPaidPesewas) : null,
@@ -248,12 +251,12 @@ export function createOrder(req, res) {
       }
     }
 
-    if (!isHubtelConfigured()) {
+    if (!isFlutterwaveConfigured()) {
       throw httpError(
         503,
-        'Mobile money payments are not set up yet. Please contact NKAY to complete this order.',
+        'Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getHubtelConfig().missing }
+        { missing: getFlutterwaveConfig().missing }
       );
     }
 
@@ -304,13 +307,16 @@ export function createOrder(req, res) {
       idempotencyKey: idempotencyKey || null,
       paymentStatus: 'pending',
       orderStatus: 'new',
-      paymentChannel: 'mobile_money',
-      paymentProvider: null,
+      paymentChannel: 'flutterwave',
+      paymentProvider: 'flutterwave',
+      paymentMethod: null,
       paymentPhone: null,
       paymentReference: null,
       paymentReferences: [],
-      hubtelTransactionId: null,
-      paymentPromptedAt: null,
+      paymentLink: null,
+      paymentLinkCreatedAt: null,
+      paymentLinkExpiresAt: null,
+      paymentTransactionId: null,
       paymentCheckedAt: null,
       paymentAttempts: 0,
       amountPaidPesewas: null,
@@ -355,23 +361,31 @@ export function listCustomerOrders(req, res) {
 }
 
 export function getPaymentSettings(_req, res) {
-  return res.json({ success: true, settings: publicHubtelSettings() });
+  return res.json({ success: true, settings: publicFlutterwaveSettings() });
 }
 
 export function getAdminPaymentSettings(_req, res) {
-  return res.json({ success: true, settings: adminHubtelSettings() });
+  return res.json({ success: true, settings: adminFlutterwaveSettings() });
+}
+
+function paymentReferenceMatches(order, txRef) {
+  const reference = String(txRef || '').trim();
+  if (!reference) return false;
+  if (reference === order.orderNumber) return true;
+  if (reference === order.paymentReference) return true;
+  return Array.isArray(order.paymentReferences) && order.paymentReferences.includes(reference);
 }
 
 /**
- * Applies a Hubtel-confirmed paid result to an order.
+ * Applies a Flutterwave-verified paid result to an order.
  *
  * This function is deliberately synchronous: the final "is it paid?" check,
  * stock reservation and order write all happen in the same event-loop tick.
- * Two concurrent callbacks therefore cannot both decrement stock — the second
+ * Two concurrent webhooks therefore cannot both decrement stock — the second
  * sees `paymentStatus: 'paid'` and returns without touching inventory.
  *
- * `verification` comes from checkMobileMoneyStatus(), never from a callback
- * body or the browser.
+ * `verification` comes from verifyTransactionById/ByReference(), never from a
+ * webhook body or the browser.
  */
 function applyVerifiedPayment(orderId, verification, actor) {
   const current = getOrderById(orderId);
@@ -384,34 +398,41 @@ function applyVerifiedPayment(orderId, verification, actor) {
   }
 
   const nowIso = new Date().toISOString();
-  const transactionId = verification.transactionId || current.hubtelTransactionId || null;
+  const transactionId = verification.transactionId || current.paymentTransactionId || null;
   const paidPesewas = Number.isFinite(verification.amountPesewas) ? verification.amountPesewas : null;
   const currency = String(verification.currency || '').toUpperCase();
   const expectedPesewas = Math.round(Number(current.totalPesewas) || 0);
 
   const mismatchReason = (() => {
     if (!(paidPesewas > 0)) {
-      return 'Hubtel confirmed a payment but did not return a valid amount. Please contact NKAY support — do not pay again.';
+      return 'Flutterwave confirmed a payment but did not return a valid amount. Please contact NKAY support — do not pay again.';
     }
     if (currency !== 'GHS') {
-      return `Hubtel confirmed a payment in ${currency || 'an unknown currency'} instead of GHS. Please contact NKAY support — do not pay again.`;
+      return `Flutterwave confirmed a payment in ${currency || 'an unknown currency'} instead of GHS. Please contact NKAY support — do not pay again.`;
     }
     if (paidPesewas !== expectedPesewas) {
-      return `Hubtel confirmed ${toGhs(paidPesewas)} but this order total is ${toGhs(expectedPesewas)}. Please contact NKAY support — do not pay again.`;
+      return `Flutterwave confirmed ${toGhs(paidPesewas)} but this order total is ${toGhs(expectedPesewas)}. Please contact NKAY support — do not pay again.`;
     }
     return '';
   })();
 
+  const paymentDetails = {
+    paymentProvider: 'flutterwave',
+    paymentChannel: 'flutterwave',
+    paymentMethod: verification.paymentMethod || current.paymentMethod || null,
+    paymentTransactionId: transactionId,
+    amountPaidPesewas: paidPesewas || null,
+    paymentCurrency: currency || null,
+    paymentCheckedAt: nowIso,
+    paymentVerifiedAt: nowIso,
+    paymentVerifiedBy: actor,
+  };
+
   if (mismatchReason) {
     const updated = updateOrder(current.id, {
+      ...paymentDetails,
       paymentStatus: 'attention',
       orderStatus: 'new',
-      hubtelTransactionId: transactionId,
-      amountPaidPesewas: paidPesewas || null,
-      paymentCurrency: currency || null,
-      paymentCheckedAt: nowIso,
-      paymentVerifiedAt: nowIso,
-      paymentVerifiedBy: actor,
       failureReason: mismatchReason,
     });
     return { order: updated, state: 'attention', message: mismatchReason };
@@ -423,14 +444,9 @@ function applyVerifiedPayment(orderId, verification, actor) {
     const names = reservation.failures.map((failure) => failure.productName || failure.productId).join(', ');
     const reason = `Payment was received, but stock ran out for: ${names}. NKAY support will contact you about a refund — do not pay again.`;
     const updated = updateOrder(current.id, {
+      ...paymentDetails,
       paymentStatus: 'attention',
       orderStatus: 'new',
-      hubtelTransactionId: transactionId,
-      amountPaidPesewas: paidPesewas,
-      paymentCurrency: currency,
-      paymentCheckedAt: nowIso,
-      paymentVerifiedAt: nowIso,
-      paymentVerifiedBy: actor,
       paidAt: nowIso,
       stockReservedAt: null,
       failureReason: reason,
@@ -439,14 +455,9 @@ function applyVerifiedPayment(orderId, verification, actor) {
   }
 
   const updated = updateOrder(current.id, {
+    ...paymentDetails,
     paymentStatus: 'paid',
     orderStatus: 'confirmed',
-    hubtelTransactionId: transactionId,
-    amountPaidPesewas: paidPesewas,
-    paymentCurrency: currency,
-    paymentCheckedAt: nowIso,
-    paymentVerifiedAt: nowIso,
-    paymentVerifiedBy: actor,
     paidAt: nowIso,
     stockReservedAt: nowIso,
     failureReason: null,
@@ -455,37 +466,52 @@ function applyVerifiedPayment(orderId, verification, actor) {
 }
 
 /**
- * Re-queries Hubtel and records the authoritative result for an order.
- * Never trusts a callback payload, a browser flag, or a cached status.
+ * Re-queries Flutterwave and records the authoritative result for an order.
+ * Never trusts a webhook payload, a redirect query string, or a browser flag.
  */
-async function verifyPaymentForOrder(order, actor) {
-  const reference = order.paymentReference || order.orderNumber;
-  if (!reference) {
+async function verifyPaymentForOrder(order, actor, { transactionId } = {}) {
+  const reference = String(order.paymentReference || order.orderNumber || '').trim();
+  const lookupId = String(transactionId || order.paymentTransactionId || '').trim();
+  if (!reference && !lookupId) {
     return { order, state: 'pending', message: 'This order has no payment reference yet.' };
   }
 
-  const verification = await checkMobileMoneyStatus({
-    reference,
-    transactionId: order.hubtelTransactionId,
-  });
+  const verification = lookupId
+    ? await verifyTransactionById(lookupId)
+    : await verifyTransactionByReference(reference);
 
   if (!verification.ok) {
-    if (verification.state === 'mismatch') {
-      const reason = 'Hubtel returned payment details that do not match this order. Please contact NKAY support — do not pay again.';
-      const updated = updateOrder(order.id, {
-        paymentStatus: 'attention',
-        paymentCheckedAt: new Date().toISOString(),
-        failureReason: reason,
-      });
-      return { order: updated, state: 'attention', message: reason };
-    }
     // Network/provider trouble is temporary: keep the order exactly as it is
     // and let the next poll or the reconciler try again.
     return {
       order,
       state: 'unavailable',
-      message: 'We could not reach Hubtel to confirm this payment yet. This page will keep checking.',
+      message: 'We could not reach Flutterwave to confirm this payment yet. This page will keep checking.',
     };
+  }
+
+  if (verification.txRef && !paymentReferenceMatches(order, verification.txRef)) {
+    const reason = 'Flutterwave returned payment details that do not match this order. Please contact NKAY support — do not pay again.';
+    const updated = updateOrder(order.id, {
+      paymentStatus: 'attention',
+      paymentCheckedAt: new Date().toISOString(),
+      failureReason: reason,
+    });
+    return { order: updated, state: 'attention', message: reason };
+  }
+
+  if (
+    order.paymentTransactionId &&
+    verification.transactionId &&
+    String(order.paymentTransactionId) !== String(verification.transactionId)
+  ) {
+    const reason = 'Flutterwave returned a different transaction for this order. Please contact NKAY support — do not pay again.';
+    const updated = updateOrder(order.id, {
+      paymentStatus: 'attention',
+      paymentCheckedAt: new Date().toISOString(),
+      failureReason: reason,
+    });
+    return { order: updated, state: 'attention', message: reason };
   }
 
   if (verification.state === 'paid') {
@@ -493,41 +519,62 @@ async function verifyPaymentForOrder(order, actor) {
   }
 
   const nowIso = new Date().toISOString();
+  const transactionDetails = {
+    paymentProvider: 'flutterwave',
+    paymentChannel: 'flutterwave',
+    paymentMethod: verification.paymentMethod || order.paymentMethod || null,
+    paymentTransactionId: verification.transactionId || order.paymentTransactionId || null,
+    paymentCheckedAt: nowIso,
+  };
 
   if (verification.state === 'refunded') {
-    const reason = 'Hubtel reports this payment was refunded. Contact NKAY support if you need help with this order.';
+    const reason = 'Flutterwave reports this payment was refunded. Contact NKAY support if you need help with this order.';
     const updated = updateOrder(order.id, {
+      ...transactionDetails,
       paymentStatus: 'failed',
       orderStatus: 'new',
-      paymentCheckedAt: nowIso,
       failureReason: reason,
     });
     return { order: updated, state: 'failed', message: reason };
   }
 
   if (verification.state === 'failed') {
-    const reason = 'The mobile money payment was not completed. You can try again with the button below.';
+    const reason = verification.processorResponse
+      ? `The payment was not completed (${verification.processorResponse}). You can try again.`
+      : 'The payment was not completed. You can try again — you have not been charged.';
     const updated = updateOrder(order.id, {
+      ...transactionDetails,
       paymentStatus: 'failed',
       orderStatus: 'new',
-      hubtelTransactionId: verification.transactionId || order.hubtelTransactionId || null,
-      paymentCheckedAt: nowIso,
-      failureReason: order.failureReason || reason,
+      failureReason: reason,
     });
-    return { order: updated, state: 'failed', message: updated.failureReason };
+    return { order: updated, state: 'failed', message: reason };
   }
 
-  // Pending / unknown: Hubtel has not reached a final state. Record the check
-  // so the UI and reconciler can see progress without changing the outcome.
-  const updated = updateOrder(order.id, {
-    paymentCheckedAt: nowIso,
-    hubtelTransactionId: verification.transactionId || order.hubtelTransactionId || null,
-  });
+  const expiresAt = order.paymentLinkExpiresAt ? Date.parse(order.paymentLinkExpiresAt) : 0;
+  if (expiresAt && expiresAt < Date.now()) {
+    const reason = 'The Flutterwave payment session expired. You can start a new payment — you have not been charged.';
+    const updated = updateOrder(order.id, {
+      ...transactionDetails,
+      paymentStatus: 'failed',
+      orderStatus: 'new',
+      failureReason: reason,
+    });
+    return { order: updated, state: 'failed', message: reason };
+  }
+
+  // Pending / unknown: Flutterwave has not reached a final state. Record the
+  // check so the UI and reconciler can see progress without changing the outcome.
+  const updated = updateOrder(order.id, transactionDetails);
   return {
     order: updated,
     state: 'pending',
-    message: 'Waiting for you to approve the prompt on your phone.',
+    message: 'Waiting for Flutterwave to confirm your payment.',
   };
+}
+
+function newPaymentReference(orderNumber) {
+  return `${orderNumber}-${Date.now().toString(36).toUpperCase()}-${randomBytes(2).toString('hex').toUpperCase()}`;
 }
 
 export async function initiateOrderPayment(req, res) {
@@ -546,61 +593,32 @@ export async function initiateOrderPayment(req, res) {
         'PAYMENT_NEEDS_ATTENTION'
       );
     }
-    if (!isHubtelConfigured()) {
+    if (!isFlutterwaveConfigured()) {
       throw httpError(
         503,
-        'Mobile money payments are not set up yet. Please contact NKAY to complete this order.',
+        'Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getHubtelConfig().missing }
+        { missing: getFlutterwaveConfig().missing }
       );
-    }
-
-    const provider = providerById(req.body?.provider);
-    if (!provider) {
-      throw httpError(400, 'Choose the mobile money wallet you will pay from.', 'INVALID_PROVIDER', {
-        provider: 'Choose MTN MoMo, Telecel Cash or AT Money.',
-      });
-    }
-
-    const walletPhone = toLocalMsisdn(req.body?.phone || order.paymentPhone || order.customerPhone);
-    if (!walletPhone) {
-      throw httpError(400, 'Enter a valid Ghana mobile money number.', 'INVALID_PAYMENT_PHONE', {
-        phone: 'Enter a valid Ghana mobile money number, e.g. 055 123 4567.',
-      });
     }
 
     const now = Date.now();
     const attempts = Number(order.paymentAttempts) || 0;
-    const promptedAt = order.paymentPromptedAt ? Date.parse(order.paymentPromptedAt) : 0;
-    const reference = order.paymentReference || order.orderNumber;
+    const expiresAt = order.paymentLinkExpiresAt ? Date.parse(order.paymentLinkExpiresAt) : 0;
+    const liveLink = Boolean(
+      order.paymentStatus === 'processing' && order.paymentLink && (!expiresAt || expiresAt > now)
+    );
 
-    // Always ask Hubtel for the truth before prompting again. This prevents a
-    // second charge when the first prompt was already approved.
-    if (order.paymentStatus === 'processing' || order.paymentStatus === 'failed' || order.hubtelTransactionId) {
-      const verification = await checkMobileMoneyStatus({
-        reference,
-        transactionId: order.hubtelTransactionId,
+    // Reuse an unexpired checkout link instead of creating a second one.
+    if (liveLink) {
+      return res.json({
+        success: true,
+        order: publicOrder(order),
+        paymentLink: order.paymentLink,
+        state: 'processing',
+        reused: true,
+        message: 'Continue your payment on Flutterwave.',
       });
-
-      if (verification.ok && verification.state === 'paid') {
-        const applied = applyVerifiedPayment(order.id, verification, 'hubtel');
-        return res.json({
-          success: true,
-          order: publicOrder(applied.order),
-          alreadyPaid: true,
-          state: applied.state,
-          message: applied.message,
-        });
-      }
-
-      if (verification.ok && verification.state === 'pending' && now - promptedAt < PROMPT_RETRY_MS) {
-        return res.status(409).json({
-          success: false,
-          error: 'A payment prompt is already waiting on your phone. Approve it, then check again.',
-          code: 'PAYMENT_PROMPT_ACTIVE',
-          order: publicOrder(order),
-        });
-      }
     }
 
     if (attempts >= MAX_PAYMENT_ATTEMPTS) {
@@ -610,65 +628,69 @@ export async function initiateOrderPayment(req, res) {
         'TOO_MANY_PAYMENT_ATTEMPTS'
       );
     }
-    if (promptedAt && now - promptedAt < PROMPT_MIN_INTERVAL_MS) {
-      const waitSec = Math.max(1, Math.ceil((PROMPT_MIN_INTERVAL_MS - (now - promptedAt)) / 1000));
-      throw httpError(429, `Please wait ${waitSec} seconds before requesting another prompt.`, 'PAYMENT_PROMPT_COOLDOWN', {
-        waitSec,
-      });
+
+    const lastCreatedAt = order.paymentLinkCreatedAt ? Date.parse(order.paymentLinkCreatedAt) : 0;
+    if (lastCreatedAt && now - lastCreatedAt < PAYMENT_LINK_MIN_INTERVAL_MS) {
+      const waitSec = Math.max(1, Math.ceil((PAYMENT_LINK_MIN_INTERVAL_MS - (now - lastCreatedAt)) / 1000));
+      throw httpError(
+        429,
+        `Please wait ${waitSec} seconds before starting another payment.`,
+        'PAYMENT_LINK_COOLDOWN',
+        { waitSec }
+      );
     }
 
-    const result = await initiateMobileMoneyPayment({
-      orderNumber: reference,
+    if (!paymentRedirectUrl(order.id)) {
+      throw httpError(
+        503,
+        'The payment return URL is not configured on this server.',
+        'PAYMENTS_NOT_CONFIGURED',
+        { missing: getFlutterwaveConfig().missing }
+      );
+    }
+
+    const txRef = newPaymentReference(order.orderNumber);
+    const created = await createPaymentLink({
+      txRef,
       amountPesewas: order.totalPesewas,
-      customerName: order.customerName,
-      customerEmail: order.customerEmail,
-      customerPhone: walletPhone,
-      provider: provider.id,
+      currency: order.currency || 'GHS',
+      customer: {
+        name: order.customerName,
+        email: order.customerEmail,
+        phone: order.customerPhone,
+      },
+      orderId: order.id,
+      orderNumber: order.orderNumber,
       description: `NKAY order ${order.orderNumber}`,
     });
 
-    const promptedIso = new Date().toISOString();
-
-    if (result.state === 'rejected') {
-      const updated = updateOrder(order.id, {
-        paymentStatus: 'failed',
-        paymentProvider: provider.id,
-        paymentPhone: walletPhone,
-        paymentAttempts: attempts + 1,
-        paymentCheckedAt: promptedIso,
-        failureReason: result.message || 'Hubtel declined the payment request.',
-      });
-      return res.json({
-        success: true,
-        order: publicOrder(updated),
-        promptSent: false,
-        state: 'failed',
-        message: updated.failureReason,
-      });
-    }
-
-    const uncertain = result.state !== 'accepted';
+    const createdIso = new Date().toISOString();
+    const sessionMs = Math.max(5, Number(getFlutterwaveConfig().sessionMinutes) || 60) * 60 * 1000;
+    const previousReferences = Array.isArray(order.paymentReferences) ? order.paymentReferences : [];
     const updated = updateOrder(order.id, {
       paymentStatus: 'processing',
       orderStatus: 'new',
-      paymentProvider: provider.id,
-      paymentPhone: walletPhone,
-      hubtelTransactionId: result.transactionId || order.hubtelTransactionId || null,
-      paymentPromptedAt: promptedIso,
+      paymentProvider: 'flutterwave',
+      paymentChannel: 'flutterwave',
+      paymentMethod: null,
+      paymentPhone: order.customerPhone,
+      paymentReference: txRef,
+      paymentReferences: [...new Set([...previousReferences, txRef])],
+      paymentLink: created.link,
+      paymentLinkCreatedAt: createdIso,
+      paymentLinkExpiresAt: new Date(now + sessionMs).toISOString(),
+      paymentTransactionId: null,
+      paymentCheckedAt: createdIso,
       paymentAttempts: attempts + 1,
-      paymentCheckedAt: promptedIso,
       failureReason: null,
     });
 
-    return res.status(202).json({
+    return res.status(201).json({
       success: true,
       order: publicOrder(updated),
-      promptSent: true,
+      paymentLink: created.link,
       state: 'processing',
-      uncertain,
-      message: uncertain
-        ? 'The request reached Hubtel but we did not get a confirmation. Check your phone and approve the prompt if it appears — do not pay twice.'
-        : `Approve the ${provider.name} prompt on ${walletPhone}.`,
+      message: 'Redirecting you to Flutterwave to complete payment.',
     });
   } catch (error) {
     return sendError(res, error);
@@ -684,15 +706,16 @@ export async function verifyOrderPayment(req, res) {
     if (order.paymentStatus === 'paid') {
       return res.json({ success: true, order: publicOrder(order), state: 'paid', message: 'Payment confirmed.' });
     }
-    if (!isHubtelConfigured()) {
+    if (!isFlutterwaveConfigured()) {
       throw httpError(
         503,
-        'Mobile money payments are not set up yet. Please contact NKAY to complete this order.',
+        'Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.',
         'PAYMENTS_NOT_CONFIGURED'
       );
     }
 
-    const result = await verifyPaymentForOrder(order, 'hubtel');
+    const transactionId = String(req.body?.transactionId || '').trim();
+    const result = await verifyPaymentForOrder(order, 'flutterwave', { transactionId });
     return res.json({
       success: true,
       order: publicOrder(result.order),
@@ -710,16 +733,17 @@ export async function recheckOrderPayment(req, res) {
     if (!order) {
       throw httpError(404, 'Order not found.', 'ORDER_NOT_FOUND');
     }
-    if (!isHubtelConfigured()) {
+    if (!isFlutterwaveConfigured()) {
       throw httpError(
         503,
-        'Hubtel is not configured on this server.',
+        'Flutterwave is not configured on this server.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getHubtelConfig().missing }
+        { missing: getFlutterwaveConfig().missing }
       );
     }
 
-    const result = await verifyPaymentForOrder(order, req.adminEmail || 'admin');
+    const transactionId = String(req.body?.transactionId || '').trim();
+    const result = await verifyPaymentForOrder(order, req.adminEmail || 'admin', { transactionId });
     return res.json({
       success: true,
       order: publicOrder(result.order),
@@ -732,59 +756,57 @@ export async function recheckOrderPayment(req, res) {
 }
 
 /**
- * Hubtel calls this after the customer approves or declines the prompt.
- * The payload is treated as a hint only: we look up the order by the
- * reference and re-query the status endpoint before changing anything.
+ * Flutterwave calls this after a charge completes.
+ * The payload is treated as a hint only: we look up the order by tx_ref and
+ * re-query the transaction verification endpoint before changing anything.
  */
-export async function handleHubtelCallback(req, res) {
+export async function handleFlutterwaveWebhook(req, res) {
   try {
-    const config = getHubtelConfig();
-    if (config.callbackToken) {
-      const provided = String(req.query?.token || req.headers['x-hubtel-token'] || '').trim();
-      if (provided !== config.callbackToken) {
-        return res.status(401).json({ success: false, error: 'Invalid callback token.' });
-      }
+    if (!verifyWebhookSignature(req.get('verif-hash'))) {
+      return res.status(401).json({ success: false, error: 'Invalid webhook signature.' });
     }
 
-    const reference =
-      callbackReference(req.body) ||
-      String(req.body?.ClientReference || req.body?.clientReference || req.body?.reference || '').trim();
-
-    if (!reference) {
+    const event = String(req.body?.event || '').trim();
+    const data = req.body?.data && typeof req.body.data === 'object' ? req.body.data : {};
+    if (event !== 'charge.completed') {
       return res.json({ success: true, ignored: true });
     }
 
-    const order = getOrderByReference(reference);
+    const txRef = String(data.tx_ref || '').trim();
+    const transactionId = data.id != null ? String(data.id) : '';
+    if (!txRef) {
+      return res.json({ success: true, ignored: true });
+    }
+
+    const order = getOrderByReference(txRef);
     if (!order) {
-      // Unknown reference: acknowledge so Hubtel does not keep retrying.
+      // Unknown reference: acknowledge so Flutterwave does not keep retrying.
       return res.json({ success: true, ignored: true });
     }
     if (order.paymentStatus === 'paid') {
       return res.json({ success: true, alreadyPaid: true });
     }
 
-    const result = await verifyPaymentForOrder(order, 'hubtel-callback');
-    console.log(
-      `Hubtel callback for ${order.orderNumber}: ${result.state}`
-    );
+    const result = await verifyPaymentForOrder(order, 'flutterwave-webhook', { transactionId });
+    console.log(`Flutterwave webhook for ${order.orderNumber}: ${result.state}`);
     return res.json({ success: true, state: result.state, alreadyPaid: result.state === 'paid' });
   } catch (error) {
-    // Always acknowledge callbacks we cannot process; Hubtel retries
+    // Always acknowledge callbacks we cannot process; Flutterwave retries
     // aggressively and the reconciler will catch up independently.
-    console.error('Hubtel callback error:', error);
+    console.error('Flutterwave webhook error:', error);
     return res.json({ success: true, ignored: true });
   }
 }
 
 /**
- * Reconciles live payments that have not received a usable callback.
- * Safe to call repeatedly and from a timer; it never prompts a wallet and
- * never marks an order paid without a fresh Hubtel status check.
+ * Reconciles live payments that have not received a usable webhook.
+ * Safe to call repeatedly and from a timer; it never creates a payment link
+ * and never marks an order paid without a fresh Flutterwave verification.
  */
 let reconciling = false;
 export async function reconcilePendingPayments({ maxAgeMs = 24 * 60 * 60 * 1000, limit = 25 } = {}) {
   if (reconciling) return { checked: 0, skipped: true };
-  if (!isHubtelConfigured()) return { checked: 0, skipped: true };
+  if (!isFlutterwaveConfigured()) return { checked: 0, skipped: true };
 
   reconciling = true;
   try {

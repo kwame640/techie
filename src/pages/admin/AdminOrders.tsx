@@ -3,13 +3,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  CreditCard,
   Loader2,
   Package,
   Phone,
   RefreshCw,
   ServerCog,
   ShieldCheck,
-  Smartphone,
   XCircle,
 } from 'lucide-react';
 import { ApiError, apiRequest, formatGhs } from '../../lib/api';
@@ -26,15 +26,14 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: 'all', label: 'All orders' },
 ];
 
-const WALLET_NAMES: Record<string, string> = {
-  MTN: 'MTN MoMo',
-  Telecel: 'Telecel Cash',
-  AT: 'AT Money',
-};
-
-function walletName(id: string | null | undefined) {
-  if (!id) return 'Mobile money';
-  return WALLET_NAMES[id] || id;
+function paymentMethodName(method: string | null | undefined) {
+  const value = String(method || '').toLowerCase();
+  if (!value) return 'Flutterwave';
+  if (value.includes('mobilemoney') || value.includes('mobile_money')) return 'Mobile money';
+  if (value === 'card') return 'Card';
+  if (value.includes('bank')) return 'Bank transfer';
+  if (value === 'ussd') return 'USSD';
+  return value.replace(/[_-]+/g, ' ');
 }
 
 function paymentBadge(order: OrderView) {
@@ -58,6 +57,19 @@ function when(value: string | null | undefined) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '—';
   return parsed.toLocaleString('en-GH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function ConfigFlag({ ok, label }: { ok?: boolean; label: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+        ok ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'
+      }`}
+    >
+      {ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+      {label}
+    </span>
+  );
 }
 
 export const AdminOrders = () => {
@@ -145,15 +157,15 @@ export const AdminOrders = () => {
       );
       setOrders((current) => current.map((item) => (item.id === data.order.id ? data.order : item)));
       if (data.state === 'paid') {
-        setNotice(`Hubtel confirmed payment for ${order.orderNumber}. Stock has been updated.`);
+        setNotice(`Flutterwave confirmed payment for ${order.orderNumber}. Stock has been updated.`);
       } else if (data.state === 'attention') {
-        setNotice(`Hubtel confirmed money for ${order.orderNumber}, but the order needs attention. Do not ask the customer to pay again.`);
+        setNotice(`Flutterwave confirmed money for ${order.orderNumber}, but the order needs attention. Do not ask the customer to pay again.`);
       } else if (data.state === 'failed') {
-        setNotice(`Hubtel reports payment was not completed for ${order.orderNumber}.`);
+        setNotice(`Flutterwave reports payment was not completed for ${order.orderNumber}.`);
       } else if (data.state === 'unavailable') {
-        setNotice(`Hubtel could not be reached for ${order.orderNumber}. Try again shortly.`);
+        setNotice(`Flutterwave could not be reached for ${order.orderNumber}. Try again shortly.`);
       } else {
-        setNotice(`Still waiting for Hubtel to confirm ${order.orderNumber}.`);
+        setNotice(`Still waiting for Flutterwave to confirm ${order.orderNumber}.`);
       }
     } catch (recheckError) {
       setError(recheckError instanceof ApiError ? recheckError.message : 'Could not re-check this payment.');
@@ -182,20 +194,27 @@ export const AdminOrders = () => {
         <div className="p-6 border-b flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-text flex items-center gap-2">
-              <ServerCog className="w-5 h-5 text-primary" /> Hubtel payments
+              <ServerCog className="w-5 h-5 text-primary" /> Flutterwave payments
             </h2>
             <p className="text-sm text-text-light mt-1">
-              Customers approve a prompt on their phone. Every payment is verified with Hubtel on the server before
-              an order is confirmed.
+              Customers pay on Flutterwave&apos;s hosted checkout. Every payment is verified with Flutterwave on the
+              server before an order is confirmed.
             </p>
           </div>
-          <span
-            className={`shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-              settings?.enabled ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-            }`}
-          >
-            {settingsLoading ? 'Checking…' : settings?.enabled ? 'Live' : 'Not configured'}
-          </span>
+          <div className="shrink-0 flex flex-col items-end gap-1.5">
+            <span
+              className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+                settings?.enabled ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+              }`}
+            >
+              {settingsLoading ? 'Checking…' : settings?.enabled ? 'Live' : 'Not configured'}
+            </span>
+            {settings?.enabled && (
+              <span className="text-[11px] font-semibold text-text-light uppercase tracking-wide">
+                {settings.mode === 'live' ? 'Live keys' : settings.mode === 'test' ? 'Test keys' : 'Unknown mode'}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="p-6">
@@ -210,13 +229,16 @@ export const AdminOrders = () => {
               {settings.enabled ? (
                 <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800 flex gap-2">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>Checkout is collecting mobile money through Hubtel. Credentials stay on the server.</span>
+                  <span>
+                    Checkout is collecting card, mobile money and bank payments through Flutterwave. API keys stay on
+                    the server.
+                  </span>
                 </div>
               ) : (
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 flex gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold">Checkout is disabled until Hubtel is configured</p>
+                    <p className="font-semibold">Checkout is disabled until Flutterwave is configured</p>
                     <p className="mt-1">
                       Set these environment variables on the server, then restart it:{' '}
                       <span className="font-semibold">
@@ -228,37 +250,71 @@ export const AdminOrders = () => {
                 </div>
               )}
 
+              {!settings.webhookSecure && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 flex gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Webhooks are not ready</p>
+                    <p className="mt-1">
+                      Set a public HTTPS <span className="font-semibold">PUBLIC_SERVER_URL</span> and the{' '}
+                      <span className="font-semibold">FLW_WEBHOOK_SECRET_HASH</span> from your Flutterwave dashboard.
+                      Without them, payments are still confirmed by the automatic re-check but slower.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid sm:grid-cols-2 gap-4 text-sm">
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Callback URL</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Webhook URL</p>
                   <p className="mt-1 break-all font-medium text-text">
-                    {settings.callbackUrl || 'Not set — add PUBLIC_SERVER_URL'}
+                    {settings.webhookUrl || 'Not set — add PUBLIC_SERVER_URL'}
                   </p>
                   <p className="text-xs text-text-light mt-1">
                     {settings.webhookSecure
-                      ? 'Public HTTPS endpoint. Hubtel can reach it.'
-                      : 'Must be a public HTTPS URL for Hubtel to deliver callbacks.'}
+                      ? 'Public HTTPS endpoint. Paste this URL into the Flutterwave dashboard webhook settings.'
+                      : 'Must be a public HTTPS URL for Flutterwave to deliver webhooks.'}
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Wallets</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Credentials</p>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {(settings.channels.length ? settings.channels : []).map((channel) => (
-                      <span
-                        key={channel.id}
-                        className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700"
-                      >
-                        {channel.name}
-                      </span>
-                    ))}
-                    {!settings.channels.length && <span className="text-text-light">—</span>}
+                    <ConfigFlag ok={settings.secretKeySet} label={settings.secretKeySet ? 'Secret key set' : 'Secret key missing'} />
+                    <ConfigFlag ok={settings.publicKeySet} label={settings.publicKeySet ? 'Public key set' : 'Public key missing'} />
+                    <ConfigFlag
+                      ok={settings.webhookSecretSet}
+                      label={settings.webhookSecretSet ? 'Webhook hash set' : 'Webhook hash missing'}
+                    />
                   </div>
-                  <p className="text-xs text-text-light mt-1">Each wallet is collected on its Hubtel channel.</p>
+                  <p className="text-xs text-text-light mt-1">
+                    Keys are read from <span className="font-semibold">FLW_SECRET_KEY</span>,{' '}
+                    <span className="font-semibold">FLW_PUBLIC_KEY</span> and{' '}
+                    <span className="font-semibold">FLW_WEBHOOK_SECRET_HASH</span>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Checkout return URL</p>
+                  <p className="mt-1 break-all font-medium text-text">
+                    {settings.redirectUrlPattern || 'Not set — add PUBLIC_APP_URL'}
+                  </p>
+                  <p className="text-xs text-text-light mt-1">
+                    Flutterwave sends the customer back here after payment.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Checkout session</p>
+                  <p className="mt-1 font-medium text-text">{settings.sessionMinutes} minutes</p>
+                  <p className="text-xs text-text-light mt-1">
+                    Unpaid links expire after this window and can be re-issued from the order page.
+                  </p>
                 </div>
               </div>
 
               <p className="text-xs text-text-light">
-                Payments without a callback are re-checked automatically every minute while this server runs. You can
+                Payments without a webhook are re-checked automatically every minute while this server runs. You can
                 also re-check any order below.
               </p>
             </div>
@@ -274,7 +330,8 @@ export const AdminOrders = () => {
                 <Package className="w-5 h-5 text-primary" /> Orders &amp; payments
               </h2>
               <p className="text-sm text-text-light mt-1">
-                Hubtel confirms payments automatically. Re-check any order to ask Hubtel for the latest status.
+                Flutterwave confirms payments automatically. Re-check any order to ask Flutterwave for the latest
+                status.
               </p>
             </div>
             <button
@@ -369,28 +426,27 @@ export const AdminOrders = () => {
 
                     <div className="rounded-xl bg-[#faf8f6] border border-[#eee5df] p-3.5 text-sm">
                       <p className="text-xs font-semibold uppercase tracking-wide text-text-light flex items-center gap-1.5">
-                        <Smartphone className="w-3.5 h-3.5" /> Payment
+                        <CreditCard className="w-3.5 h-3.5" /> Payment
                       </p>
                       <div className="mt-1.5 space-y-0.5 text-xs text-[#5f5148]">
                         <p>
-                          Wallet: <span className="font-semibold">{walletName(order.paymentProvider)}</span>
+                          Method:{' '}
+                          <span className="font-semibold">
+                            {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'Flutterwave checkout'}
+                          </span>
                         </p>
-                        {order.paymentPhone && (
-                          <p>
-                            Paid from: <span className="font-semibold">{order.paymentPhone}</span>
-                          </p>
-                        )}
                         <p>
                           Reference: <span className="font-semibold break-all">{order.paymentReference || order.orderNumber}</span>
                         </p>
-                        {order.hubtelTransactionId && (
+                        {order.paymentTransactionId && (
                           <p>
-                            Hubtel ID: <span className="font-semibold break-all">{order.hubtelTransactionId}</span>
+                            Flutterwave ID:{' '}
+                            <span className="font-semibold break-all">{order.paymentTransactionId}</span>
                           </p>
                         )}
-                        {order.paymentPromptedAt && (
+                        {order.paymentStatus === 'processing' && order.paymentLinkExpiresAt && (
                           <p>
-                            Prompt sent: <span className="font-semibold">{when(order.paymentPromptedAt)}</span>
+                            Link expires: <span className="font-semibold">{when(order.paymentLinkExpiresAt)}</span>
                           </p>
                         )}
                         {order.amountPaid != null && (
@@ -402,7 +458,7 @@ export const AdminOrders = () => {
                       {order.paymentStatus === 'paid' && order.paymentVerifiedAt && (
                         <p className="mt-2 text-[11px] text-green-700 flex items-center gap-1">
                           <ShieldCheck className="w-3 h-3" />
-                          Confirmed by Hubtel {when(order.paymentVerifiedAt)}
+                          Confirmed by Flutterwave {when(order.paymentVerifiedAt)}
                         </p>
                       )}
                       {order.failureReason && order.paymentStatus !== 'paid' && (
@@ -419,7 +475,7 @@ export const AdminOrders = () => {
                         className="inline-flex items-center gap-2 rounded-lg border border-[#e0d3ca] bg-white px-3.5 py-2 text-xs font-semibold text-[#6f3d27] hover:bg-[#fbf5f1] transition disabled:opacity-40"
                       >
                         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                        Re-check with Hubtel
+                        Re-check with Flutterwave
                       </button>
                       {order.paymentStatus === 'attention' && (
                         <span className="text-[11px] text-red-600">

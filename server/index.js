@@ -17,11 +17,11 @@ import {
   initiateOrderPayment,
   verifyOrderPayment,
   recheckOrderPayment,
-  handleHubtelCallback,
+  handleFlutterwaveWebhook,
   reconcilePendingPayments,
   listAllOrders,
 } from './controllers/orderController.js';
-import { isHubtelConfigured, getHubtelConfig } from './services/hubtelService.js';
+import { isFlutterwaveConfigured, getFlutterwaveConfig } from './services/flutterwaveService.js';
 import { authenticateAdmin } from './middleware/auth.js';
 import { authenticateVendor, requireVendorOwnership } from './middleware/vendorAuth.js';
 import { createVendorToken, verifyVendorToken } from './services/vendorSession.js';
@@ -443,11 +443,11 @@ app.post('/api/otp/verify', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Orders & Hubtel mobile money payments
+// Orders & Flutterwave payments
 // Prices and stock are resolved from the server-side catalogue; amounts sent
-// by the browser are never trusted. The customer picks a wallet, Hubtel sends
-// a prompt to their phone, and the server verifies the result with Hubtel
-// before marking the order paid and decrementing stock.
+// by the browser are never trusted. Customers pay on Flutterwave's hosted
+// checkout and the server verifies every transaction with Flutterwave before
+// marking an order paid and decrementing stock.
 // ---------------------------------------------------------------------------
 app.post('/api/orders/quote', quoteOrder);
 app.post('/api/orders', createOrder);
@@ -457,7 +457,7 @@ app.post('/api/orders/:id/pay', initiateOrderPayment);
 app.post('/api/orders/:id/payment/verify', verifyOrderPayment);
 
 app.get('/api/payments/settings', getPaymentSettings);
-app.post('/api/payments/hubtel/callback', handleHubtelCallback);
+app.post('/api/payments/flutterwave/webhook', handleFlutterwaveWebhook);
 
 app.get('/api/admin/orders', authenticateAdmin, listAllOrders);
 app.post('/api/admin/orders/:id/payment/verify', authenticateAdmin, recheckOrderPayment);
@@ -465,14 +465,14 @@ app.get('/api/admin/payment-settings', authenticateAdmin, getAdminPaymentSetting
 
 // Health check
 app.get('/api/health', (req, res) => {
-  const config = getHubtelConfig();
+  const config = getFlutterwaveConfig();
   res.json({
     status: 'ok',
     message: 'Server is running',
     payments: {
-      method: 'hubtel',
-      configured: isHubtelConfigured(),
-      callbackConfigured: Boolean(config.callbackUrl),
+      method: 'flutterwave',
+      configured: isFlutterwaveConfigured(),
+      callbackConfigured: config.webhookConfigured,
       missing: config.configured ? [] : config.missing,
     },
   });
@@ -514,14 +514,17 @@ const isDirectEntry = process.argv[1] && (process.argv[1] === fileURLToPath(impo
 if (isDirectEntry) {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    if (isHubtelConfigured()) {
-      console.log('Hubtel payments: configured');
+    if (isFlutterwaveConfigured()) {
+      console.log(`Flutterwave payments: configured (${getFlutterwaveConfig().mode} mode)`);
     } else {
-      console.warn(`Hubtel payments: NOT configured (missing ${getHubtelConfig().missing.join(', ')})`);
+      console.warn(`Flutterwave payments: NOT configured (missing ${getFlutterwaveConfig().missing.join(', ')})`);
+    }
+    if (!getFlutterwaveConfig().webhookConfigured) {
+      console.warn('Flutterwave webhooks: NOT configured (set PUBLIC_SERVER_URL and FLW_WEBHOOK_SECRET_HASH)');
     }
   });
 
-  // Safety net for missed callbacks: re-check live payments with Hubtel.
+  // Safety net for missed webhooks: re-check live payments with Flutterwave.
   // Timers do not run under Vercel serverless, so this only starts for the
   // standalone server. Serverless deployments still verify on page poll and
   // whenever an admin re-checks an order.

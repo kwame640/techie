@@ -190,36 +190,43 @@ For production deployment:
 5. Use HTTPS for all communications
 6. Set up monitoring and alerts
 
-## Checkout & Hubtel Mobile Money Payments
+## Checkout & Flutterwave Payments
 
 The storefront checkout (`/customer/checkout`) creates the order on the server.
 The server never trusts prices sent by the browser: it prices every item from
 `server/data/catalogue.json`.
 
-NKAY collects **MTN MoMo, Telecel Cash and AT Money** through Hubtel's Direct
-Receive Money API. The customer never types a transaction ID or sends money to a
-personal number. The flow is:
+NKAY collects payments through **Flutterwave Standard hosted checkout**. Customers
+can pay with mobile money (MTN MoMo, Telecel Cash, AT Money), debit/credit cards or
+bank transfer. The customer never sends money to a personal number, and card or
+wallet credentials are only entered on Flutterwave's page. The flow is:
 
-1. Customer picks a wallet, enters the mobile money number, and places the order.
-   The order is created with `paymentStatus: "pending"`.
-2. The server asks Hubtel to prompt that wallet for the exact order total, using
-   the order number as the Hubtel `ClientReference`.
-3. The order moves to `paymentStatus: "processing"` and the customer approves the
-   prompt on their handset with their MoMo PIN.
-4. Hubtel calls the server's callback. The server ignores the callback's claimed
-   status and **re-queries Hubtel's transaction status endpoint**. Only a `Paid`
-   result with the exact GHS total marks the order paid.
+1. Customer fills in delivery details and places the order. The order is created
+   with `paymentStatus: "pending"`.
+2. The server asks Flutterwave to create a hosted checkout for the exact order
+   total, with a unique `tx_ref`. The order moves to
+   `paymentStatus: "processing"` and the customer is redirected to Flutterwave's
+   payment page.
+3. The customer pays on Flutterwave. Flutterwave redirects them back to
+   `/order/:orderId` with `status`, `tx_ref` and `transaction_id` in the query
+   string.
+4. Flutterwave also posts a `charge.completed` webhook to
+   `/api/payments/flutterwave/webhook`. The webhook is treated as a hint only:
+   the server ignores the body's claimed status and **re-queries Flutterwave's
+   transaction verification endpoint**. Only a `successful` result whose `tx_ref`
+   matches the order, whose currency is GHS and whose amount equals the order
+   total marks the order paid.
 5. On a verified payment the order becomes `paid` / `confirmed` and stock is
    decremented exactly once, in the same synchronous step that checks the order.
-6. If no callback arrives, the order page polls the server every 5 seconds and a
+6. If no webhook arrives, the order page polls the server every 5 seconds and a
    background reconciler re-checks live payments every minute.
-7. If Hubtel confirms money but the order cannot be fulfilled automatically
+7. If Flutterwave confirms money but the order cannot be fulfilled automatically
    (stock sold out, amount mismatch, unexpected currency), the order moves to
    `paymentStatus: "attention"` instead. The customer is told not to pay again
    and an admin arranges a refund.
 
 The browser can never mark an order paid. It can only ask the server to
-re-check, and the server decides from Hubtel's response.
+re-check, and the server decides from Flutterwave's response.
 
 ### 1. Regenerate the product catalogue
 
@@ -232,18 +239,18 @@ npm run sync:catalogue
 Run this whenever products or prices change in `src/data/marketplaceData.ts` or
 `src/data/products.ts`.
 
-### 2. Get Hubtel merchant credentials
+### 2. Get Flutterwave API keys
 
-1. Complete Hubtel merchant onboarding for NKAY.
-2. In the Hubtel dashboard open **API & Integrations → API Credentials** and copy
-   the **Client ID** and **Client Secret**.
-3. Note the **merchant account number** (Hubtel also calls it the **POS Sales
-   ID**). Every charge is made to this account.
-4. Make sure the server has a **public HTTPS URL**. Hubtel callbacks cannot reach
-   `localhost`. For local development, use a tunnel or the stub described below.
-
-If Hubtel asks you to allow-list an egress IP, add your server's static outbound
-IP to the merchant account before going live.
+1. Create an account at <https://dashboard.flutterwave.com> and complete business
+   verification for NKAY.
+2. Open **Settings → API Keys** and copy the **Public key** and **Secret key**.
+   Use the test keys while developing and switch to live keys after go-live.
+3. Open **Settings → Webhooks**, set the webhook URL to
+   `${PUBLIC_SERVER_URL}/api/payments/flutterwave/webhook`, and choose a **secret
+   hash**. Flutterwave sends that value in the `verif-hash` header on every
+   webhook.
+4. Make sure the server and the storefront are reachable over **public HTTPS**.
+   Flutterwave cannot redirect customers or deliver webhooks to `localhost`.
 
 ### 3. Environment variables
 
@@ -251,34 +258,35 @@ Copy `.env.example` to `.env` and fill in:
 
 ```env
 # Required for checkout to accept payments
-HUBTEL_CLIENT_ID=your-client-id
-HUBTEL_CLIENT_SECRET=your-client-secret
-HUBTEL_MERCHANT_ACCOUNT_NUMBER=123456
+FLW_SECRET_KEY=FLWSECK_TEST-...
+FLW_PUBLIC_KEY=FLWPUBK_TEST-...
+
+# Secret hash configured in Settings -> Webhooks
+FLW_WEBHOOK_SECRET_HASH=generate-a-long-random-string
+
+# Public URL of the storefront, e.g. https://nkay.example
+# Flutterwave returns the customer to ${PUBLIC_APP_URL}/order/:orderId
+PUBLIC_APP_URL=https://nkay.example
 
 # Public HTTPS base URL of this server, e.g. https://api.nkay.example
-# The callback becomes ${PUBLIC_SERVER_URL}/api/payments/hubtel/callback
+# The webhook becomes ${PUBLIC_SERVER_URL}/api/payments/flutterwave/webhook
+# Falls back to PUBLIC_APP_URL when omitted.
 PUBLIC_SERVER_URL=https://api.nkay.example
 
-# Optional shared secret appended to the callback URL as ?token=...
-# Recommended: without it anyone who knows the URL can trigger a re-check.
-HUBTEL_CALLBACK_TOKEN=generate-a-long-random-string
-
-# Optional overrides (defaults shown)
-HUBTEL_RECEIVE_BASE_URL=https://rmp.hubtel.com
-HUBTEL_STATUS_BASE_URL=https://api-txnstatus.hubtel.com
-HUBTEL_TIMEOUT_MS=15000
+# Optional (defaults shown)
+FLW_SESSION_MINUTES=60
+FLW_BASE_URL=https://api.flutterwave.com/v3
+FLW_TIMEOUT_MS=15000
 ```
 
-`HUBTEL_CALLBACK_URL` may be set instead of `PUBLIC_SERVER_URL` if the callback
-lives on a different host. Secrets are read only on the server and are never
-sent to the browser.
-
-Checkout is disabled until every required value exists. `/api/health` reports:
+Secrets are read only on the server and are never sent to the browser. Checkout is
+disabled until `FLW_SECRET_KEY` and `PUBLIC_APP_URL` (or `PUBLIC_SERVER_URL`) exist.
+`/api/health` reports:
 
 ```json
 {
   "payments": {
-    "method": "hubtel",
+    "method": "flutterwave",
     "configured": true,
     "callbackConfigured": true,
     "missing": []
@@ -295,17 +303,22 @@ Open **Admin → Orders & payments**. The filters are **Needs attention**,
 **In progress**, **Awaiting payment**, **Paid**, **Not confirmed** and
 **All orders**.
 
-The top card shows whether Hubtel is configured, the callback URL, whether it is
-HTTPS, and the wallet channels. Configuration is environment-based, so there is
-nothing to edit in the dashboard.
+The top card shows whether Flutterwave is configured and which key mode is in use
+(test or live), the webhook URL and whether it is HTTPS, which credentials are set,
+the checkout return URL and the checkout session length. Configuration is
+environment-based, so there is nothing to edit in the dashboard.
 
-For any unpaid order, **Re-check with Hubtel** asks Hubtel for the latest status
-and applies the same verification rules as the customer flow. Use it when a
-customer says they approved a prompt but the page has not updated.
+For any unpaid order, **Re-check with Flutterwave** asks Flutterwave for the latest
+status and applies the same verification rules as the customer flow. Use it when a
+customer says they paid but the page has not updated.
 
-**Needs attention** means Hubtel confirmed money but automatic fulfilment was
+**Needs attention** means Flutterwave confirmed money but automatic fulfilment was
 not safe. Never ask that customer to pay again. Compare the amount paid and the
 order total, then refund or fulfil manually.
+
+An unpaid checkout link expires after `FLW_SESSION_MINUTES` (60 by default). The
+customer can start a new payment from the order page; the server reuses a live link
+instead of creating duplicates and caps how many links an order can have.
 
 ### 5. Data storage
 
@@ -317,19 +330,25 @@ before taking real orders in production.
 
 ### 6. Testing without live credentials
 
-`HUBTEL_RECEIVE_BASE_URL` and `HUBTEL_STATUS_BASE_URL` exist so the integration
-can be exercised against a local stub. When using a stub, still set all required
-Hubtel variables (including `PUBLIC_SERVER_URL`) so the normal code path runs.
-Never point those variables at a third-party server in production.
+`FLW_BASE_URL` exists so the integration can be exercised against a local stub.
+When using a stub, still set `FLW_SECRET_KEY` and `PUBLIC_APP_URL` so the normal
+code path runs. Never point that variable at a third-party server in production.
+
+Flutterwave test keys are the easiest way to exercise the real hosted checkout:
+test transactions are authorised automatically after a few seconds and no real
+money moves.
 
 The integration is also safe to test manually:
 
 - Submitting the same order twice with the same `idempotencyKey` returns the
   original order instead of creating a second one.
-- Approving the same prompt twice (callback + poll) marks the order paid once.
-- A callback for an unknown reference is acknowledged and ignored.
+- A webhook and a page poll arriving together mark the order paid once.
+- A webhook with a missing or wrong `verif-hash` is rejected with `401`.
+- A webhook for an unknown `tx_ref` is acknowledged and ignored.
 - A paid amount that does not match the order total never decrements stock; the
   order becomes `attention`.
+- An expired checkout link can be re-issued from the order page without creating a
+  duplicate charge.
 
 ## Support
 

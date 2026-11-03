@@ -4,12 +4,12 @@ import {
   AlertCircle,
   ArrowLeft,
   Check,
+  CreditCard,
   Loader2,
   LockKeyhole,
   MapPin,
   ShieldCheck,
   ShoppingBag,
-  Smartphone,
   Store,
   Truck,
 } from 'lucide-react';
@@ -19,7 +19,6 @@ import { ApiError, apiRequest, formatGhs } from '../../lib/api';
 import { rememberOrderId } from '../../lib/orders';
 import { ghanaRegions } from '../../data/marketplaceData';
 import type { OrderQuote, OrderView, PaymentSettings } from '../../types/orders';
-import mtnMomoLogo from '../../images/mtn-momo.svg';
 
 interface CheckoutForm {
   name: string;
@@ -46,12 +45,6 @@ const EMPTY_FORM: CheckoutForm = {
   landmark: '',
   notes: '',
 };
-
-const MOMO_PROVIDERS = [
-  { id: 'MTN', name: 'MTN MoMo', short: 'MTN', className: 'bg-[#ffcc00] text-[#1a1a1a]' },
-  { id: 'Telecel', name: 'Telecel Cash', short: 'T', className: 'bg-[#e60000] text-white' },
-  { id: 'AT', name: 'AT Money', short: 'AT', className: 'bg-[#0a5bd3] text-white' },
-];
 
 const inputClass =
   'mt-2 w-full h-11 rounded-xl border border-[#e7ddd7] bg-white px-3 text-sm outline-none transition focus:border-[#6f3d27] focus:ring-2 focus:ring-[#6f3d27]/10';
@@ -93,11 +86,6 @@ function validate(form: CheckoutForm, method: 'home' | 'pickup') {
   return errors;
 }
 
-function isValidGhanaPhone(value: string) {
-  const digits = String(value || '').replace(/\D/g, '');
-  return /^0\d{9}$/.test(digits) || /^233\d{9}$/.test(digits);
-}
-
 export const CustomerCheckout = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -119,9 +107,6 @@ export const CustomerCheckout = () => {
 
   const [form, setForm] = useState<CheckoutForm>(loadSavedForm);
   const [deliveryMethod, setDeliveryMethod] = useState<'home' | 'pickup'>('home');
-  const [provider, setProvider] = useState('MTN');
-  const [paymentPhone, setPaymentPhone] = useState('');
-  const paymentPhoneTouched = useRef(false);
   const [settings, setSettings] = useState<PaymentSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [quote, setQuote] = useState<OrderQuote | null>(null);
@@ -148,6 +133,7 @@ export const CustomerCheckout = () => {
     }));
   }, [user]);
 
+  // Keep the form saved as the customer types; it is a convenience only.
   useEffect(() => {
     try {
       localStorage.setItem('nkay_checkout_details', JSON.stringify(form));
@@ -155,12 +141,6 @@ export const CustomerCheckout = () => {
       // Persisting the form is a convenience only.
     }
   }, [form]);
-
-  // Keep the wallet number in step with the contact number until the customer
-  // edits it deliberately — people often pay from a different wallet.
-  useEffect(() => {
-    if (!paymentPhoneTouched.current) setPaymentPhone(form.phone);
-  }, [form.phone]);
 
   useEffect(() => {
     orderRef.current = null;
@@ -227,9 +207,6 @@ export const CustomerCheckout = () => {
     setPayError(null);
 
     const errors = validate(form, deliveryMethod);
-    if (!isValidGhanaPhone(paymentPhone)) {
-      errors.paymentPhone = 'Enter the mobile money number that will approve the prompt.';
-    }
     setFieldErrors(errors);
     if (Object.keys(errors).length) {
       document.getElementById('checkout-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -237,7 +214,7 @@ export const CustomerCheckout = () => {
     }
     if (!quote || quoteLoading || quoteError) return;
     if (!settings?.enabled) {
-      setPayError('Mobile money payments are not set up yet. Please contact NKAY to complete this order.');
+      setPayError('Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.');
       return;
     }
 
@@ -274,24 +251,31 @@ export const CustomerCheckout = () => {
         if (!buyNowProductId) clearCart();
       }
 
-      // Ask Hubtel to prompt the wallet. Any response (accepted, declined or
-      // uncertain) carries the updated order, and the order page is the source
-      // of truth for what happens next. A thrown error still leaves a real
-      // order behind, so the customer is sent there to retry safely.
+      // Ask the server for a Flutterwave hosted-checkout link. The order page
+      // is the source of truth if anything goes wrong, because a real order
+      // always exists by this point.
       let payError: string | null = null;
+      let paymentLink: string | null = null;
       try {
-        await apiRequest<{ order: OrderView }>(`/api/orders/${encodeURIComponent(order.id)}/pay`, {
-          method: 'POST',
-          body: JSON.stringify({ provider, phone: paymentPhone.trim() }),
-        });
+        const started = await apiRequest<{ order: OrderView; paymentLink?: string }>(
+          `/api/orders/${encodeURIComponent(order.id)}/pay`,
+          { method: 'POST' }
+        );
+        order = started.order;
+        paymentLink = started.paymentLink || started.order.paymentLink || null;
       } catch (payFailure) {
         payError =
           payFailure instanceof ApiError
             ? payFailure.message
-            : 'We could not reach the payment prompt. You can try again on the order page.';
+            : 'We could not start the Flutterwave checkout. You can try again on the order page.';
       }
 
-      navigate(`/order/${order.id}`, { state: { provider, payError } });
+      if (paymentLink) {
+        window.location.assign(paymentLink);
+        return;
+      }
+
+      navigate(`/order/${order.id}`, { state: { payError } });
     } catch (error) {
       if (error instanceof ApiError) {
         setPayError(error.message);
@@ -535,15 +519,17 @@ export const CustomerCheckout = () => {
                 <h2 className="text-lg font-bold">Payment method</h2>
               </div>
               <p className="text-sm text-[#927f74] mb-6">
-                Choose your wallet and the number it is registered to. Hubtel sends a prompt to your phone —
-                approve it to pay. NKAY confirms the payment before your order is processed.
+                Pay securely on Flutterwave with mobile money, a debit or credit card, or bank transfer.
+                You will be redirected to Flutterwave to complete payment, then brought back to your order.
               </p>
 
               <div className="rounded-xl border border-[#6f3d27] bg-[#fbf5f1] ring-1 ring-[#6f3d27] p-4 flex items-start gap-3">
-                <Smartphone className="w-5 h-5 text-[#6f3d27] shrink-0 mt-0.5" />
+                <CreditCard className="w-5 h-5 text-[#6f3d27] shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-sm">Mobile Money</p>
-                  <p className="text-xs text-[#927f74] mt-0.5">MTN MoMo · Telecel Cash · AT Money</p>
+                  <p className="font-semibold text-sm">Flutterwave secure checkout</p>
+                  <p className="text-xs text-[#927f74] mt-0.5">
+                    Mobile money · Debit/credit card · Bank transfer
+                  </p>
                 </div>
               </div>
 
@@ -554,66 +540,22 @@ export const CustomerCheckout = () => {
               )}
 
               {!settingsLoading && settings?.enabled && (
-                <>
-                  <div className="mt-4">
-                    <p className="text-sm font-semibold text-[#4e362a]">Which wallet will you pay from?</p>
-                    <div className="grid grid-cols-3 gap-2 mt-2.5">
-                      {MOMO_PROVIDERS.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setProvider(item.id)}
-                          className={`rounded-xl border p-2.5 transition ${provider === item.id ? 'border-[#6f3d27] ring-1 ring-[#6f3d27] bg-white' : 'border-[#e7ddd7] bg-white hover:border-[#c9b3a7]'}`}
-                        >
-                          {item.id === 'MTN' ? (
-                            <img src={mtnMomoLogo} alt="MTN MoMo" className="h-7 w-full object-contain" />
-                          ) : (
-                            <span className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${item.className}`}>
-                              {item.short}
-                            </span>
-                          )}
-                          <span className="mt-1.5 block text-[11px] font-medium text-[#4e362a]">{item.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <label className={labelClass} htmlFor="checkout-payment-phone">
-                      Mobile money number
-                    </label>
-                    <input
-                      id="checkout-payment-phone"
-                      className={inputClass}
-                      value={paymentPhone}
-                      onChange={(event) => {
-                        paymentPhoneTouched.current = true;
-                        setPaymentPhone(event.target.value);
-                        setFieldErrors((current) => ({ ...current, paymentPhone: '' }));
-                      }}
-                      placeholder="055 123 4567"
-                      inputMode="tel"
-                      autoComplete="tel"
-                    />
-                    {fieldErrors.paymentPhone && (
-                      <p className="text-xs text-red-600 mt-1">{fieldErrors.paymentPhone}</p>
-                    )}
-                    <p className="text-xs text-[#927f74] mt-2 flex gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                      You will receive a prompt on this phone. Enter your MoMo PIN on your handset to approve —
-                      never share it with anyone.
-                    </p>
-                  </div>
-                </>
+                <div className="mt-4 rounded-xl bg-[#f5faf5] border border-[#dcecdd] p-4 text-xs text-[#45704c] flex gap-2">
+                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    NKAY confirms the exact total before Flutterwave opens. Your card or mobile money details
+                    are entered on Flutterwave — never on this page.
+                  </span>
+                </div>
               )}
 
               {!settingsLoading && !settings?.enabled && (
                 <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 flex gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold">Mobile money isn’t set up yet</p>
+                    <p className="font-semibold">Payments aren’t set up yet</p>
                     <p className="mt-1">
-                      Hubtel payments are not configured on the NKAY server. Please contact NKAY to finish this order.
+                      Flutterwave is not configured on the NKAY server. Please contact NKAY to finish this order.
                     </p>
                   </div>
                 </div>
@@ -643,19 +585,17 @@ export const CustomerCheckout = () => {
               >
                 {processing ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Sending payment prompt…
+                    <Loader2 className="w-4 h-4 animate-spin" /> Opening Flutterwave…
                   </>
                 ) : (
                   <>
                     <LockKeyhole className="w-4 h-4" />
-                    {quote
-                      ? `Pay with ${MOMO_PROVIDERS.find((item) => item.id === provider)?.name || 'mobile money'} · ${formatGhs(quote.total)}`
-                      : 'Preparing your order…'}
+                    {quote ? `Pay ${formatGhs(quote.total)} with Flutterwave` : 'Preparing your order…'}
                   </>
                 )}
               </button>
               <p className="mt-3 text-center text-[11px] text-[#9a887d] flex items-center justify-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5" /> Stock is only reserved after Hubtel confirms your payment.
+                <ShieldCheck className="w-3.5 h-3.5" /> Stock is only reserved after Flutterwave confirms your payment.
               </p>
             </section>
           </form>

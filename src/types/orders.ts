@@ -30,10 +30,10 @@ export interface OrderDelivery {
 }
 
 /**
- * pending     — order created, no wallet prompt sent yet.
- * processing  — Hubtel accepted the request and is prompting the wallet.
- * paid        — Hubtel verified the payment; stock has been reserved.
- * failed      — the wallet declined, cancelled, or the prompt expired.
+ * pending     — order created; no Flutterwave checkout link yet.
+ * processing  — Flutterwave checkout link created; customer is paying.
+ * paid        — Flutterwave verified the payment; stock has been reserved.
+ * failed      — the payment failed, was cancelled, or the checkout expired.
  * attention   — money was received but cannot be fulfilled automatically
  *               (stock gone or amount mismatch). Requires a human/refund.
  */
@@ -51,12 +51,16 @@ export interface OrderView {
   deliveryFee: number;
   total: number;
   paymentStatus: OrderPaymentStatus;
-  paymentChannel: 'mobile_money' | null;
+  paymentChannel: 'flutterwave' | 'mobile_money' | null;
   paymentProvider: string | null;
+  /** Flutterwave payment type, e.g. card or mobilemoneygh. */
+  paymentMethod: string | null;
   paymentPhone: string | null;
   paymentReference: string | null;
-  hubtelTransactionId: string | null;
-  paymentPromptedAt: string | null;
+  paymentLink: string | null;
+  paymentLinkCreatedAt: string | null;
+  paymentLinkExpiresAt: string | null;
+  paymentTransactionId: string | null;
   paymentCheckedAt: string | null;
   paymentAttempts: number;
   amountPaid: number | null;
@@ -67,28 +71,23 @@ export interface OrderView {
   delivery: OrderDelivery;
 }
 
-export interface PaymentProviderOption {
-  id: string;
-  name: string;
-}
-
 export interface PaymentSettings {
-  method: 'hubtel';
+  method: 'flutterwave';
+  providerName: string;
   enabled: boolean;
-  providers: PaymentProviderOption[];
   callbackConfigured: boolean;
   missing: string[];
 }
 
 export interface AdminPaymentSettings extends PaymentSettings {
-  callbackUrl: string | null;
+  mode: 'test' | 'live' | 'unset';
+  secretKeySet: boolean;
+  publicKeySet: boolean;
+  webhookSecretSet: boolean;
+  webhookUrl: string | null;
   webhookSecure: boolean;
-  channels: Array<{ id: string; name: string; channel: string }>;
-}
-
-export interface PaymentStartInput {
-  provider: string;
-  phone: string;
+  redirectUrlPattern: string | null;
+  sessionMinutes: number;
 }
 
 export interface PaymentVerificationResult {
