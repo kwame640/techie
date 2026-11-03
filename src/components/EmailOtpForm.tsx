@@ -10,6 +10,34 @@ interface EmailOtpFormProps {
   purpose?: string;
 }
 
+const RESEND_COOLDOWN_MS = 60 * 1000;
+
+const lastSentKey = (email: string) => `nkayOtpLastSent:${email.toLowerCase()}`;
+
+function readLastSent(email: string): number {
+  try {
+    return Number(localStorage.getItem(lastSentKey(email))) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function rememberLastSent(email: string) {
+  try {
+    localStorage.setItem(lastSentKey(email), String(Date.now()));
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
+function forgetLastSent(email: string) {
+  try {
+    localStorage.removeItem(lastSentKey(email));
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
 /**
  * Reusable 6-digit email OTP form backed by /api/otp/send and /api/otp/verify.
  * Used when a new account is created and during checkout verification.
@@ -57,6 +85,7 @@ export const EmailOtpForm: React.FC<EmailOtpFormProps> = ({
         return;
       }
       if (data?.devCode) setDevCode(data.devCode);
+      rememberLastSent(email);
       setCooldown(60);
     } catch {
       setError('Could not reach the server. Please try again.');
@@ -70,6 +99,17 @@ export const EmailOtpForm: React.FC<EmailOtpFormProps> = ({
     // survives the re-run, so only one code is requested per email.
     if (sentForEmail.current === email) return;
     sentForEmail.current = email;
+
+    // A reload would otherwise request a brand-new code, invalidating the one
+    // already in the customer's inbox. Reuse the cooldown instead.
+    const elapsed = Date.now() - readLastSent(email);
+    if (elapsed >= 0 && elapsed < RESEND_COOLDOWN_MS) {
+      const remaining = Math.max(1, Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000));
+      setCooldown(remaining);
+      setNotice(`A code was already sent to ${email}. Enter it below, or resend in ${remaining}s.`);
+      return;
+    }
+
     sendCode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email]);
@@ -107,6 +147,9 @@ export const EmailOtpForm: React.FC<EmailOtpFormProps> = ({
       setDevCode('');
       setNotice('');
       setCode('');
+      // The code has been consumed, so a later verification (e.g. at checkout)
+      // should be able to request a fresh one right away.
+      forgetLastSent(email);
       onVerified();
     } catch {
       setError('Could not reach the server. Please try again.');
