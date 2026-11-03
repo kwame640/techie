@@ -1126,11 +1126,8 @@ export const ghanaRegions = [
 
 export const businessCategories = [
   'Electronics',
-  'Fashion',
-  'Beauty',
   'Home & Kitchen',
   'Phones & Accessories',
   'Computer & Technology',
-  'Health & Personal Care',
 ];
 

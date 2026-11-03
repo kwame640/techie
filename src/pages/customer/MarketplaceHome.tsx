@@ -380,17 +380,6 @@ export const MarketplaceHome = () => {
         <nav className="bg-white/95 backdrop-blur border-t lg:border-t-0 border-b border-gray-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-1.5 sm:gap-2 py-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className={`flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium transition-all ${
-                  selectedCategory === null
-                    ? 'bg-primary text-white shadow-soft'
-                    : 'bg-white text-text-light hover:bg-accent-beige hover:text-primary border border-gray-200'
-                }`}
-              >
-                <Grid3x3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                All
-              </button>
               {businessCategories.map((category) => {
                 const isSelected = selectedCategory === category;
                 return (
@@ -484,22 +473,7 @@ export const MarketplaceHome = () => {
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[#927f74] mb-3 px-2">Categories</h3>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedCategory(null);
-                      setMobileNavOpen(false);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all ${
-                      selectedCategory === null
-                        ? 'bg-primary text-white shadow-soft'
-                        : 'bg-white text-text-light hover:bg-accent-beige hover:text-primary border border-gray-100'
-                    }`}
-                  >
-                    <Grid3x3 className="w-3.5 h-3.5" />
-                    All
-                  </button>
-                  {businessCategories.slice(0, 11).map((category) => {
+                  {businessCategories.map((category) => {
                     const isSelected = selectedCategory === category;
                     return (
                       <button
