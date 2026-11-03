@@ -330,11 +330,49 @@ have.
 
 ### 5. Data storage
 
-Orders and stock overrides are stored as JSON under `server/models/data/`
-(`orders.json`, `stock.json`). These files are runtime state and are git-ignored.
-On Vercel they fall back to `/tmp`, which is ephemeral and not shared between
-instances — configure a persistent database (and a persistent stock ledger)
-before taking real orders in production.
+Orders and stock live in **Cloud Firestore** so they survive redeploys and are
+shared by every serverless instance. The app reuses the Firebase service account
+already used for OTPs and business registrations.
+
+Set these environment variables (a Firebase service account key):
+
+```env
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+The private key can be pasted with literal `\n` sequences; the server normalises
+it. Create the key in Firebase Console → **Project settings** → **Service
+accounts** → **Generate new private key**.
+
+Firestore collections:
+
+| Collection | Document | Purpose |
+|---|---|---|
+| `orders` | one document per order id | Full order and payment record |
+| `stock` | one document per product id, field `value` | Remaining units after sales |
+
+No composite indexes are required.
+
+**Fail-closed behaviour:** when `VERCEL` is set and Firebase is not configured,
+`POST /api/orders` returns `503 ORDER_STORAGE_NOT_CONFIGURED` instead of writing
+the order to `/tmp`. This prevents taking money for an order that could vanish.
+`GET /api/health` reports it:
+
+```json
+"storage": { "mode": "local-json", "durable": false }
+```
+
+Set the three Firebase variables and redeploy until it reads
+`{ "mode": "firestore", "durable": true }`.
+
+Local development without Firebase still uses the JSON files under
+`server/models/data/` (`orders.json`, `stock.json`), which are git-ignored. This
+fallback is single-process only — never use it in production.
+
+Stock is decremented inside the same Firestore transaction that marks the order
+paid, so two callbacks arriving on different instances cannot both reduce stock.
 
 ### 6. Testing without live credentials
 

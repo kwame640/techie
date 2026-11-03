@@ -22,6 +22,7 @@ import {
   listAllOrders,
 } from './controllers/orderController.js';
 import { isExpressPayConfigured, getExpressPayConfig } from './services/expresspayService.js';
+import { orderStoreInfo } from './models/orderModel.js';
 import { authenticateAdmin } from './middleware/auth.js';
 import { authenticateVendor, requireVendorOwnership } from './middleware/vendorAuth.js';
 import { createVendorToken, verifyVendorToken } from './services/vendorSession.js';
@@ -466,6 +467,7 @@ app.get('/api/admin/payment-settings', authenticateAdmin, getAdminPaymentSetting
 // Health check
 app.get('/api/health', (req, res) => {
   const config = getExpressPayConfig();
+  const storage = orderStoreInfo();
   res.json({
     status: 'ok',
     message: 'Server is running',
@@ -474,6 +476,10 @@ app.get('/api/health', (req, res) => {
       configured: isExpressPayConfigured(),
       callbackConfigured: config.callbackConfigured,
       missing: config.configured ? [] : config.missing,
+    },
+    storage: {
+      mode: storage.mode,
+      durable: storage.durable,
     },
   });
 });
@@ -521,6 +527,12 @@ if (isDirectEntry) {
     }
     if (!getExpressPayConfig().callbackConfigured) {
       console.warn('ExpressPay callback: NOT configured (set a public HTTPS PUBLIC_SERVER_URL)');
+    }
+    const storage = orderStoreInfo();
+    if (storage.durable) {
+      console.log(`Order storage: ${storage.mode}`);
+    } else {
+      console.warn(`Order storage: ${storage.mode} (set FIREBASE_* to persist orders on serverless hosts)`);
     }
   });
 

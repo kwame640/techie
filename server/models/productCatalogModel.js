@@ -1,14 +1,20 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getFirestoreDb, isFirestoreConfigured } from './firestoreClient.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const CATALOGUE_PATH = path.join(__dirname, '../data/catalogue.json');
+const STOCK_COLLECTION = 'stock';
 const STOCK_PATH = process.env.VERCEL
   ? path.join('/tmp', 'nkay_data', 'stock.json')
   : path.join(__dirname, 'data', 'stock.json');
+
+const STOCK_CACHE_TTL_MS = 5000;
+const stockCache = new Map();
+let stockHydratedAt = 0;
 
 let catalogueCache = null;
 
@@ -53,6 +59,47 @@ export function getCatalogueMeta() {
   };
 }
 
+/** Stock straight from the generated catalogue, ignoring sold units. */
+export function getCatalogueStock(productId) {
+  const product = loadCatalogue().productsById.get(String(productId));
+  return product ? Number(product.stock) || 0 : 0;
+}
+
+/**
+ * Loads the current stock overrides into the in-process cache.
+ *
+ * Only needed when Firestore is configured: the local JSON mode reads its file
+ * synchronously and is always up to date. Called at the start of quote/order
+ * requests so a cold serverless instance does not serve catalogue defaults for
+ * products that have already sold out.
+ */
+export async function hydrateStock() {
+  const database = getFirestoreDb();
+  if (!database) return;
+
+  const now = Date.now();
+  if (now - stockHydratedAt < STOCK_CACHE_TTL_MS) return;
+
+  const snapshot = await database.collection(STOCK_COLLECTION).get();
+  const next = new Map();
+  for (const document of snapshot.docs) {
+    const value = document.get('value');
+    if (Number.isInteger(value)) next.set(document.id, value);
+  }
+
+  stockCache.clear();
+  for (const [productId, value] of next.entries()) stockCache.set(productId, value);
+  stockHydratedAt = Date.now();
+}
+
+/** Records stock values written by a transaction so later reads in this process agree. */
+export function rememberStock(entries) {
+  if (!isFirestoreConfigured()) return;
+  for (const [productId, value] of entries.entries()) {
+    if (Number.isInteger(value)) stockCache.set(String(productId), value);
+  }
+}
+
 export function getProduct(productId) {
   const product = loadCatalogue().productsById.get(String(productId));
   if (!product) return null;
@@ -64,11 +111,14 @@ export function getBusiness(businessId) {
 }
 
 export function getEffectiveStock(productId) {
-  const product = loadCatalogue().productsById.get(String(productId));
-  if (!product) return 0;
-  const overrides = readStockOverrides();
-  const override = overrides[product.id];
-  return Number.isInteger(override) ? override : product.stock;
+  const id = String(productId);
+  if (isFirestoreConfigured()) {
+    const cached = stockCache.get(id);
+    return Number.isInteger(cached) ? cached : getCatalogueStock(id);
+  }
+
+  const override = readStockOverrides()[id];
+  return Number.isInteger(override) ? override : getCatalogueStock(id);
 }
 
 export function getDeliveryFeePesewas(method) {
@@ -78,11 +128,13 @@ export function getDeliveryFeePesewas(method) {
 }
 
 /**
- * Decrements stock for the supplied items. The check and write happen
- * synchronously in the same tick, so two concurrent requests cannot both
- * pass the availability check in this process.
+ * Decrements stock against the local JSON file. The check and write happen
+ * synchronously in the same tick, so two concurrent requests cannot both pass
+ * the availability check in this process.
+ *
+ * Firestore deployments use the transactional path in orderModel.js instead.
  */
-export function reserveStock(items) {
+export function reserveStockLocal(items) {
   const overrides = readStockOverrides();
   const available = new Map();
   const failures = [];

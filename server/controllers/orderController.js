@@ -1,10 +1,18 @@
-import { getCatalogueMeta, getProduct, getBusiness, getDeliveryFeePesewas, reserveStock } from '../models/productCatalogModel.js';
+import {
+  getCatalogueMeta,
+  getProduct,
+  getBusiness,
+  getDeliveryFeePesewas,
+  hydrateStock,
+} from '../models/productCatalogModel.js';
 import {
   createOrder as persistOrder,
+  finalizePaidOrder,
   getOrderById,
   getOrderByPaymentToken,
   findByIdempotencyKey,
   getOrderByReference,
+  orderStoreInfo,
   updateOrder,
   listOrders as listStoredOrders,
   listOrdersByPaymentStatus,
@@ -230,8 +238,9 @@ export function publicOrder(order) {
   };
 }
 
-export function quoteOrder(req, res) {
+export async function quoteOrder(req, res) {
   try {
+    await hydrateStock();
     const items = normalizeItems(req.body?.items);
     const deliveryMethod = req.body?.deliveryMethod === 'pickup' ? 'pickup' : 'home';
     const quote = buildQuote(items, deliveryMethod);
@@ -241,11 +250,11 @@ export function quoteOrder(req, res) {
   }
 }
 
-export function createOrder(req, res) {
+export async function createOrder(req, res) {
   try {
     const idempotencyKey = String(req.body?.idempotencyKey || '').trim();
     if (idempotencyKey) {
-      const existing = findByIdempotencyKey(idempotencyKey);
+      const existing = await findByIdempotencyKey(idempotencyKey);
       if (existing) {
         return res.status(200).json({ success: true, order: publicOrder(existing), reused: true });
       }
@@ -260,6 +269,20 @@ export function createOrder(req, res) {
       );
     }
 
+    // Fail closed on serverless: /tmp is not shared between instances and is
+    // wiped on redeploy, so an order created there could disappear after the
+    // customer has paid.
+    const store = orderStoreInfo();
+    if (process.env.VERCEL && !store.durable) {
+      throw httpError(
+        503,
+        'Checkout is temporarily unavailable. Please contact NKAY to complete this order.',
+        'ORDER_STORAGE_NOT_CONFIGURED',
+        { storage: store.mode }
+      );
+    }
+
+    await hydrateStock();
     const items = normalizeItems(req.body?.items);
     const customerName = String(req.body?.customer?.name || '').trim();
     const customerPhone = String(req.body?.customer?.phone || '').trim();
@@ -283,7 +306,7 @@ export function createOrder(req, res) {
     const quote = buildQuote(items, delivery.method);
     const orderId = newOrderId();
 
-    const order = persistOrder({
+    const order = await persistOrder({
       id: orderId,
       customerId: customerId || null,
       customerName,
@@ -336,8 +359,8 @@ export function createOrder(req, res) {
   }
 }
 
-export function getOrder(req, res) {
-  const order = getOrderById(String(req.params.id || ''));
+export async function getOrder(req, res) {
+  const order = await getOrderById(String(req.params.id || ''));
   if (!order) {
     return res.status(404).json({ success: false, error: 'Order not found.', code: 'ORDER_NOT_FOUND' });
   }
@@ -345,7 +368,7 @@ export function getOrder(req, res) {
   return res.json({ success: true, order: publicOrder(order) });
 }
 
-export function listCustomerOrders(req, res) {
+export async function listCustomerOrders(req, res) {
   // Orders are looked up by their unguessable ID (a capability token), which
   // lets guests see the orders they created without exposing other customers'
   // data by email.
@@ -354,8 +377,7 @@ export function listCustomerOrders(req, res) {
     .map((value) => value.trim())
     .filter(Boolean)
     .slice(0, 50);
-  const orders = ids
-    .map((id) => getOrderById(id))
+  const orders = (await Promise.all(ids.map((id) => getOrderById(id))))
     .filter(Boolean)
     .map(publicOrder);
   res.setHeader('Cache-Control', 'no-store');
@@ -404,16 +426,16 @@ function resolvePaymentToken(order, suppliedToken) {
 /**
  * Applies an ExpressPay-verified paid result to an order.
  *
- * This function is deliberately synchronous: the final "is it paid?" check,
- * stock reservation and order write all happen in the same event-loop tick.
- * Two concurrent callbacks therefore cannot both decrement stock — the second
- * sees `paymentStatus: 'paid'` and returns without touching inventory.
+ * The final "is it paid?" check, stock decrement and order write happen inside
+ * one Firestore transaction (see finalizePaidOrder). Two callbacks arriving at
+ * the same moment on different serverless instances therefore serialise: one
+ * commits, the other sees `paymentStatus: 'paid'` and leaves inventory alone.
  *
  * `verification` comes from the ExpressPay Query API, never from a callback
  * body, the redirect query string or the browser.
  */
-function applyVerifiedPayment(orderId, verification, actor) {
-  const current = getOrderById(orderId);
+async function applyVerifiedPayment(orderId, verification, actor) {
+  const current = await getOrderById(orderId);
   if (!current) return { order: null, state: 'missing', message: 'Order not found.' };
   if (current.paymentStatus === 'paid') {
     return { order: current, state: 'paid', message: 'Payment was already confirmed.' };
@@ -455,7 +477,7 @@ function applyVerifiedPayment(orderId, verification, actor) {
   };
 
   if (mismatchReason) {
-    const updated = updateOrder(current.id, {
+    const updated = await updateOrder(current.id, {
       ...paymentDetails,
       paymentStatus: 'attention',
       orderStatus: 'new',
@@ -465,30 +487,17 @@ function applyVerifiedPayment(orderId, verification, actor) {
   }
 
   // The customer really did pay. Stock is only decremented now, and only once.
-  const reservation = reserveStock(current.items);
-  if (!reservation.ok) {
-    const names = reservation.failures.map((failure) => failure.productName || failure.productId).join(', ');
-    const reason = `Payment was received, but stock ran out for: ${names}. NKAY support will contact you about a refund — do not pay again.`;
-    const updated = updateOrder(current.id, {
-      ...paymentDetails,
-      paymentStatus: 'attention',
-      orderStatus: 'new',
-      paidAt: nowIso,
-      stockReservedAt: null,
-      failureReason: reason,
-    });
-    return { order: updated, state: 'attention', message: reason };
+  const result = await finalizePaidOrder(current.id, paymentDetails, current.items || []);
+  if (result.state === 'missing') {
+    return { order: null, state: 'missing', message: 'Order not found.' };
   }
-
-  const updated = updateOrder(current.id, {
-    ...paymentDetails,
-    paymentStatus: 'paid',
-    orderStatus: 'confirmed',
-    paidAt: nowIso,
-    stockReservedAt: nowIso,
-    failureReason: null,
-  });
-  return { order: updated, state: 'paid', message: 'Payment confirmed.' };
+  if (result.state === 'already_paid') {
+    return { order: result.order, state: 'paid', message: 'Payment was already confirmed.' };
+  }
+  if (result.state === 'attention') {
+    return { order: result.order, state: 'attention', message: result.reason };
+  }
+  return { order: result.order, state: 'paid', message: 'Payment confirmed.' };
 }
 
 /**
@@ -525,7 +534,7 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
 
   if (verification.token && !paymentTokenMatches(order, verification.token)) {
     const reason = 'ExpressPay returned payment details for a different checkout. Please contact NKAY support — do not pay again.';
-    const updated = updateOrder(order.id, {
+    const updated = await updateOrder(order.id, {
       paymentStatus: 'attention',
       paymentCheckedAt: new Date().toISOString(),
       failureReason: reason,
@@ -535,7 +544,7 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
 
   if (verification.orderReference && !paymentReferenceMatches(order, verification.orderReference)) {
     const reason = 'ExpressPay returned payment details that do not match this order. Please contact NKAY support — do not pay again.';
-    const updated = updateOrder(order.id, {
+    const updated = await updateOrder(order.id, {
       paymentStatus: 'attention',
       paymentCheckedAt: new Date().toISOString(),
       failureReason: reason,
@@ -561,7 +570,7 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
     const reason = verification.resultText
       ? `ExpressPay did not complete this payment (${verification.resultText}). You can try again — you have not been charged.`
       : 'The payment was not completed. You can try again — you have not been charged.';
-    const updated = updateOrder(order.id, {
+    const updated = await updateOrder(order.id, {
       ...transactionDetails,
       paymentStatus: 'failed',
       orderStatus: 'new',
@@ -573,7 +582,7 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
   const expiresAt = order.paymentLinkExpiresAt ? Date.parse(order.paymentLinkExpiresAt) : 0;
   if (expiresAt && expiresAt < Date.now()) {
     const reason = 'The ExpressPay checkout session expired. You can start a new payment — you have not been charged.';
-    const updated = updateOrder(order.id, {
+    const updated = await updateOrder(order.id, {
       ...transactionDetails,
       paymentStatus: 'failed',
       orderStatus: 'new',
@@ -585,7 +594,7 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
   // Pending (result 4) or an unrecognised result: ExpressPay has not reached a
   // final state. Record the check so the UI and reconciler can see progress
   // without changing the outcome.
-  const updated = updateOrder(order.id, transactionDetails);
+  const updated = await updateOrder(order.id, transactionDetails);
   return {
     order: updated,
     state: 'pending',
@@ -599,7 +608,7 @@ function newPaymentReference(orderNumber) {
 
 export async function initiateOrderPayment(req, res) {
   try {
-    const order = getOrderById(String(req.params.id || '').trim());
+    const order = await getOrderById(String(req.params.id || '').trim());
     if (!order) {
       throw httpError(404, 'Order not found.', 'ORDER_NOT_FOUND');
     }
@@ -691,7 +700,7 @@ export async function initiateOrderPayment(req, res) {
     const sessionMs = Math.max(5, Number(getExpressPayConfig().sessionMinutes) || 60) * 60 * 1000;
     const previousReferences = Array.isArray(order.paymentReferences) ? order.paymentReferences : [];
     const previousTokens = Array.isArray(order.paymentTokens) ? order.paymentTokens : [];
-    const updated = updateOrder(order.id, {
+    const updated = await updateOrder(order.id, {
       paymentStatus: 'processing',
       orderStatus: 'new',
       paymentProvider: 'expresspay',
@@ -725,7 +734,7 @@ export async function initiateOrderPayment(req, res) {
 
 export async function verifyOrderPayment(req, res) {
   try {
-    const order = getOrderById(String(req.params.id || '').trim());
+    const order = await getOrderById(String(req.params.id || '').trim());
     if (!order) {
       throw httpError(404, 'Order not found.', 'ORDER_NOT_FOUND');
     }
@@ -755,7 +764,7 @@ export async function verifyOrderPayment(req, res) {
 
 export async function recheckOrderPayment(req, res) {
   try {
-    const order = getOrderById(String(req.params.id || '').trim());
+    const order = await getOrderById(String(req.params.id || '').trim());
     if (!order) {
       throw httpError(404, 'Order not found.', 'ORDER_NOT_FOUND');
     }
@@ -798,7 +807,9 @@ export async function handleExpressPayCallback(req, res) {
       return res.json({ success: true, ignored: true });
     }
 
-    const order = (token ? getOrderByPaymentToken(token) : null) || (reference ? getOrderByReference(reference) : null);
+    const order =
+      (token ? await getOrderByPaymentToken(token) : null) ||
+      (reference ? await getOrderByReference(reference) : null);
     if (!order) {
       // Unknown reference: acknowledge so ExpressPay does not keep retrying.
       return res.json({ success: true, ignored: true });
@@ -833,7 +844,7 @@ export async function reconcilePendingPayments({ maxAgeMs = 24 * 60 * 60 * 1000,
 
   reconciling = true;
   try {
-    const orders = listOrdersByPaymentStatus(['processing'], {
+    const orders = await listOrdersByPaymentStatus(['processing'], {
       updatedSinceMs: Date.now() - maxAgeMs,
       limit,
     });
@@ -853,8 +864,8 @@ export async function reconcilePendingPayments({ maxAgeMs = 24 * 60 * 60 * 1000,
   }
 }
 
-export function listAllOrders(req, res) {
-  const orders = listStoredOrders(req.query.limit).map(publicOrder);
+export async function listAllOrders(req, res) {
+  const orders = (await listStoredOrders(req.query.limit)).map(publicOrder);
   return res.json({ success: true, orders });
 }
 
