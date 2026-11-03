@@ -1,8 +1,9 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ShopProvider } from './context/ShopContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { emailsMatch, getPendingVerificationEmail } from './lib/pendingVerification';
 
 // Customer Pages
 import { StorePage } from './pages/customer/StorePage';
@@ -140,12 +141,32 @@ const BusinessProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ child
   return <>{children}</>;
 };
 
+// Keeps a newly created account on the verification screen until its email
+// code has been confirmed. Without this, a signed-in visitor could simply
+// type another URL and skip the step.
+const PendingVerificationRedirect: React.FC = () => {
+  const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isLoading || !user) return;
+    const pending = getPendingVerificationEmail();
+    if (pending && emailsMatch(pending, user.email) && location.pathname !== '/login') {
+      navigate('/login', { replace: true });
+    }
+  }, [isLoading, user, location.pathname, navigate]);
+
+  return null;
+};
+
 function App() {
   return (
     <AuthProvider>
       <ShopProvider>
         <NotificationProvider>
           <Router>
+        <PendingVerificationRedirect />
         <Routes>
           {/* Auth Routes - Blurred */}
           <Route path="/login" element={<LoginPage />} />

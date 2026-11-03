@@ -16,19 +16,15 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { EmailOtpForm } from '../../components/EmailOtpForm';
+import {
+  clearPendingVerificationEmail,
+  emailsMatch,
+  getPendingVerificationEmail,
+  setPendingVerificationEmail,
+} from '../../lib/pendingVerification';
 import logoImage from '../../images/nkay.png';
 
 type Mode = 'signin' | 'signup';
-
-const OTP_PENDING_KEY = 'nkayPendingOtpEmail';
-
-const readPendingOtp = () => {
-  try {
-    return sessionStorage.getItem(OTP_PENDING_KEY) || '';
-  } catch {
-    return '';
-  }
-};
 
 const inputClass =
   'w-full h-12 rounded-xl border border-[#e7ddd7] bg-white pl-11 pr-4 text-sm text-[#2d211b] placeholder:text-[#b3a49b] outline-none transition focus:border-[#6f3d27] focus:ring-2 focus:ring-[#6f3d27]/10';
@@ -141,19 +137,14 @@ export const LoginPage = () => {
 
   useEffect(() => {
     if (isLoading) return;
-    const pending = readPendingOtp();
+    const pending = getPendingVerificationEmail();
     if (!pending) return;
 
     // Only restore a pending verification when the same account is still
     // signed in on this device; otherwise the stored code belongs to a
     // different session and should be discarded.
-    const matchesSignedInUser = isAuthenticated && (!user?.email || user.email === pending);
-    if (!matchesSignedInUser) {
-      try {
-        sessionStorage.removeItem(OTP_PENDING_KEY);
-      } catch {
-        /* ignore storage errors */
-      }
+    if (!isAuthenticated || !emailsMatch(user?.email, pending)) {
+      clearPendingVerificationEmail();
       return;
     }
     setOtpEmail((current) => current || pending);
@@ -161,20 +152,12 @@ export const LoginPage = () => {
 
   const beginOtp = (address: string) => {
     setOtpEmail(address);
-    try {
-      sessionStorage.setItem(OTP_PENDING_KEY, address);
-    } catch {
-      /* ignore storage errors */
-    }
+    setPendingVerificationEmail(address);
   };
 
   const finishOtp = () => {
     setOtpEmail('');
-    try {
-      sessionStorage.removeItem(OTP_PENDING_KEY);
-    } catch {
-      /* ignore storage errors */
-    }
+    clearPendingVerificationEmail();
     navigate('/');
   };
 
@@ -342,9 +325,7 @@ export const LoginPage = () => {
                 <EmailOtpForm
                   email={otpEmail}
                   onVerified={finishOtp}
-                  onCancel={finishOtp}
                   submitLabel="Verify & Continue"
-                  cancelLabel="Skip for now"
                   purpose="Enter it below to activate your new account."
                 />
               </div>
