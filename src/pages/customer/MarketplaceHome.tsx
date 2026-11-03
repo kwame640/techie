@@ -10,7 +10,6 @@ import {
 import { sampleBusinesses, businessCategories, sampleProducts } from '../../data/marketplaceData';
 import { products as shopProducts } from '../../data/products';
 import logoImage from '../../images/nkay.png';
-import { HomepageCarousel } from '../../components/HomepageCarousel';
 import { CompactProductCard, type CompactProduct } from '../../components/CompactProductCard';
 import { safeFetchJson } from '../../lib/fetch';
 import { useShop } from '../../context/ShopContext';
@@ -541,11 +540,6 @@ export const MarketplaceHome = () => {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {/* Featured Businesses Carousel */}
-        <div className="mb-6 sm:mb-8">
-          <HomepageCarousel />
-        </div>
-
         {/* Featured Listings */}
         <section className="mb-8 sm:mb-10">
           <SectionHeader
