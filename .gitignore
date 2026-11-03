@@ -18,6 +18,7 @@ otp-test*
 # Local order + stock data (runtime state, not source)
 server/models/data/orders.json
 server/models/data/stock.json
+server/models/data/otps.json
 
 # Keep the environment template tracked
 !.env.example

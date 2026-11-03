@@ -15,9 +15,20 @@ import {
   Truck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { EmailOtpForm } from '../../components/EmailOtpForm';
 import logoImage from '../../images/nkay.png';
 
 type Mode = 'signin' | 'signup';
+
+const OTP_PENDING_KEY = 'nkayPendingOtpEmail';
+
+const readPendingOtp = () => {
+  try {
+    return sessionStorage.getItem(OTP_PENDING_KEY) || '';
+  } catch {
+    return '';
+  }
+};
 
 const inputClass =
   'w-full h-12 rounded-xl border border-[#e7ddd7] bg-white pl-11 pr-4 text-sm text-[#2d211b] placeholder:text-[#b3a49b] outline-none transition focus:border-[#6f3d27] focus:ring-2 focus:ring-[#6f3d27]/10';
@@ -123,9 +134,49 @@ export const LoginPage = () => {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [hasFirebaseSession, setHasFirebaseSession] = useState(false);
+  const [otpEmail, setOtpEmail] = useState('');
 
-  const { login, signup, loginWithGoogle, isAuthenticated } = useAuth();
+  const { login, signup, loginWithGoogle, isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isLoading) return;
+    const pending = readPendingOtp();
+    if (!pending) return;
+
+    // Only restore a pending verification when the same account is still
+    // signed in on this device; otherwise the stored code belongs to a
+    // different session and should be discarded.
+    const matchesSignedInUser = isAuthenticated && (!user?.email || user.email === pending);
+    if (!matchesSignedInUser) {
+      try {
+        sessionStorage.removeItem(OTP_PENDING_KEY);
+      } catch {
+        /* ignore storage errors */
+      }
+      return;
+    }
+    setOtpEmail((current) => current || pending);
+  }, [isLoading, isAuthenticated, user?.email]);
+
+  const beginOtp = (address: string) => {
+    setOtpEmail(address);
+    try {
+      sessionStorage.setItem(OTP_PENDING_KEY, address);
+    } catch {
+      /* ignore storage errors */
+    }
+  };
+
+  const finishOtp = () => {
+    setOtpEmail('');
+    try {
+      sessionStorage.removeItem(OTP_PENDING_KEY);
+    } catch {
+      /* ignore storage errors */
+    }
+    navigate('/');
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -166,9 +217,16 @@ export const LoginPage = () => {
     try {
       if (mode === 'signup') {
         await signup(cleanEmail, password, 'customer');
-      } else {
-        await login(cleanEmail, password, 'customer');
+        // Do not leave the signup screen yet: the account exists, but the
+        // visitor still has to confirm the 6-digit code sent to their email.
+        setPassword('');
+        setConfirmPassword('');
+        setError('');
+        setNotice('');
+        beginOtp(cleanEmail);
+        return;
       }
+      await login(cleanEmail, password, 'customer');
       navigate('/');
     } catch (authError) {
       const code = (authError as { code?: string } | null)?.code;
@@ -271,6 +329,28 @@ export const LoginPage = () => {
 
         {/* Form panel */}
         <section className="flex flex-col justify-center p-6 sm:p-10 lg:p-12">
+          {otpEmail ? (
+            <div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f4ece7] text-[#6f3d27]">
+                <ShieldCheck className="h-6 w-6" />
+              </div>
+              <h1 className="mt-6 text-2xl font-bold tracking-tight sm:text-3xl">Verify your email</h1>
+              <p className="mt-2 text-sm text-[#806e64]">
+                One last step to finish creating your NKAY account.
+              </p>
+              <div className="mt-6">
+                <EmailOtpForm
+                  email={otpEmail}
+                  onVerified={finishOtp}
+                  onCancel={finishOtp}
+                  submitLabel="Verify & Continue"
+                  cancelLabel="Skip for now"
+                  purpose="Enter it below to activate your new account."
+                />
+              </div>
+            </div>
+          ) : (
+            <>
           {isAuthenticated && hasFirebaseSession && (
             <div className="mb-5 flex items-start gap-2 rounded-xl border border-[#d9e7dd] bg-[#f2f8f4] p-3 text-xs text-[#2f6b45]">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
@@ -447,6 +527,8 @@ export const LoginPage = () => {
               </p>
             )}
           </form>
+            </>
+          )}
         </section>
       </div>
     </div>

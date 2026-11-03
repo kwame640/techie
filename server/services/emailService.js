@@ -43,7 +43,7 @@ export const sendOtpEmail = async (email, code) => {
         html: `
           <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #eee5df;border-radius:16px;">
             <h2 style="color:#6f3d27;margin:0 0 12px;">Your NKAY verification code</h2>
-            <p style="color:#4e362a;font-size:15px;line-height:1.5;">Use the code below to continue to checkout. It expires in 5 minutes.</p>
+            <p style="color:#4e362a;font-size:15px;line-height:1.5;">Use the code below to verify your email. It expires in 5 minutes.</p>
             <div style="margin:20px 0;padding:16px;background:#f5ebe5;border-radius:12px;text-align:center;font-size:28px;font-weight:700;letter-spacing:8px;color:#2d211b;">${code}</div>
             <p style="color:#927f74;font-size:13px;">If you did not request this code, you can safely ignore this email.</p>
           </div>
