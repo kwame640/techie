@@ -19,23 +19,22 @@ import {
   newOrderId,
 } from '../models/orderModel.js';
 import {
-  adminExpressPaySettings,
-  createCheckout,
-  getExpressPayConfig,
-  IP_ALLOWLIST_HELP,
-  isExpressPayConfigured,
-  paymentReturnUrl,
-  publicExpressPaySettings,
+  adminMoMoSettings,
+  createRequestToPay,
+  getMoMoConfig,
+  isMoMoConfigured,
+  publicMoMoSettings,
   queryTransaction,
-} from '../services/expresspayService.js';
-import { randomBytes } from 'crypto';
+  toMsisdn,
+} from '../services/momoService.js';
+import { randomBytes, randomUUID } from 'crypto';
 
 const MAX_ITEMS = 20;
 const MAX_QUANTITY = 99;
 
-// An ExpressPay hosted checkout token lives for EXPAY_SESSION_MINUTES (60 by
-// default). We reuse the live checkout instead of creating a new one, and never
-// create more than this many tokens for a single order.
+// MTN MoMo pushes a PIN prompt to the customer's phone. We reuse an
+// outstanding request instead of sending a second prompt, and never send more
+// than this many prompts for a single order.
 const MAX_PAYMENT_ATTEMPTS = 5;
 const PAYMENT_LINK_MIN_INTERVAL_MS = 20 * 1000;
 
@@ -260,12 +259,12 @@ export async function createOrder(req, res) {
       }
     }
 
-    if (!isExpressPayConfigured()) {
+    if (!isMoMoConfigured()) {
       throw httpError(
         503,
-        'Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.',
+        'Mobile money payments are not set up yet. Please contact NKAY to complete this order.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getExpressPayConfig().missing }
+        { missing: getMoMoConfig().missing }
       );
     }
 
@@ -330,8 +329,8 @@ export async function createOrder(req, res) {
       idempotencyKey: idempotencyKey || null,
       paymentStatus: 'pending',
       orderStatus: 'new',
-      paymentChannel: 'expresspay',
-      paymentProvider: 'expresspay',
+      paymentChannel: 'mtn_momo',
+      paymentProvider: 'mtn_momo',
       paymentMethod: null,
       paymentPhone: null,
       paymentReference: null,
@@ -385,11 +384,11 @@ export async function listCustomerOrders(req, res) {
 }
 
 export function getPaymentSettings(_req, res) {
-  return res.json({ success: true, settings: publicExpressPaySettings() });
+  return res.json({ success: true, settings: publicMoMoSettings() });
 }
 
 export function getAdminPaymentSettings(_req, res) {
-  return res.json({ success: true, settings: adminExpressPaySettings() });
+  return res.json({ success: true, settings: adminMoMoSettings() });
 }
 
 function paymentReferenceMatches(order, reference) {
@@ -408,9 +407,10 @@ function paymentTokenMatches(order, token) {
 }
 
 /**
- * Resolves the ExpressPay checkout token to query for this order.
- * A token supplied by the browser/callback is only accepted when it belongs to
- * this order, so one customer can never trigger a lookup against another.
+ * Resolves the MTN reference id to query for this order.
+ * A reference supplied by the browser/callback is only accepted when it
+ * belongs to this order, so one customer can never trigger a lookup against
+ * another.
  */
 function resolvePaymentToken(order, suppliedToken) {
   const supplied = String(suppliedToken || '').trim();
@@ -424,15 +424,15 @@ function resolvePaymentToken(order, suppliedToken) {
 }
 
 /**
- * Applies an ExpressPay-verified paid result to an order.
+ * Applies an MTN-verified paid result to an order.
  *
  * The final "is it paid?" check, stock decrement and order write happen inside
  * one Firestore transaction (see finalizePaidOrder). Two callbacks arriving at
  * the same moment on different serverless instances therefore serialise: one
  * commits, the other sees `paymentStatus: 'paid'` and leaves inventory alone.
  *
- * `verification` comes from the ExpressPay Query API, never from a callback
- * body, the redirect query string or the browser.
+ * `verification` comes from the MTN status API, never from a callback body,
+ * the browser or a query string.
  */
 async function applyVerifiedPayment(orderId, verification, actor) {
   const current = await getOrderById(orderId);
@@ -449,24 +449,25 @@ async function applyVerifiedPayment(orderId, verification, actor) {
   const paidPesewas = Number.isFinite(verification.amountPesewas) ? verification.amountPesewas : null;
   const currency = String(verification.currency || '').toUpperCase();
   const expectedPesewas = Math.round(Number(current.totalPesewas) || 0);
+  const expectedCurrency = String(getMoMoConfig().currency || current.currency || 'GHS').toUpperCase();
 
   const mismatchReason = (() => {
     if (!(paidPesewas > 0)) {
-      return 'ExpressPay confirmed a payment but did not return a valid amount. Please contact NKAY support — do not pay again.';
+      return 'MTN confirmed a payment but did not return a valid amount. Please contact NKAY support — do not pay again.';
     }
-    if (currency !== 'GHS') {
-      return `ExpressPay confirmed a payment in ${currency || 'an unknown currency'} instead of GHS. Please contact NKAY support — do not pay again.`;
+    if (currency !== expectedCurrency) {
+      return `MTN confirmed a payment in ${currency || 'an unknown currency'} instead of ${expectedCurrency}. Please contact NKAY support — do not pay again.`;
     }
     if (paidPesewas !== expectedPesewas) {
-      return `ExpressPay confirmed ${toGhs(paidPesewas)} but this order total is ${toGhs(expectedPesewas)}. Please contact NKAY support — do not pay again.`;
+      return `MTN confirmed ${toGhs(paidPesewas)} but this order total is ${toGhs(expectedPesewas)}. Please contact NKAY support — do not pay again.`;
     }
     return '';
   })();
 
   const paymentDetails = {
-    paymentProvider: 'expresspay',
-    paymentChannel: 'expresspay',
-    paymentMethod: verification.paymentMethod || current.paymentMethod || null,
+    paymentProvider: 'mtn_momo',
+    paymentChannel: 'mtn_momo',
+    paymentMethod: 'mtn_momo',
     paymentTransactionId: transactionId,
     paymentToken: verification.token || current.paymentToken || null,
     amountPaidPesewas: paidPesewas || null,
@@ -501,8 +502,8 @@ async function applyVerifiedPayment(orderId, verification, actor) {
 }
 
 /**
- * Re-queries ExpressPay and records the authoritative result for an order.
- * Never trusts a callback payload, a redirect query string, or a browser flag.
+ * Re-queries MTN and records the authoritative result for an order.
+ * Never trusts a callback payload, the browser, or a query string.
  */
 async function verifyPaymentForOrder(order, actor, { token } = {}) {
   const paymentToken = resolvePaymentToken(order, token);
@@ -510,7 +511,7 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
     return {
       order,
       state: 'pending',
-      message: 'This order has no payment token yet. Start the payment again.',
+      message: 'This order has no payment request yet. Start the payment again.',
     };
   }
 
@@ -518,22 +519,33 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
 
   if (!verification.ok) {
     if (verification.reason === 'not_configured') {
-      return { order, state: 'unavailable', message: 'ExpressPay is not configured on this server.' };
+      return { order, state: 'unavailable', message: 'MTN Mobile Money is not configured on this server.' };
     }
-    if (verification.reason === 'ip_blocked') {
-      return { order, state: 'unavailable', message: IP_ALLOWLIST_HELP };
+    if (verification.reason === 'credentials') {
+      return {
+        order,
+        state: 'unavailable',
+        message: 'MTN rejected this server’s MoMo credentials. Contact NKAY support with your order number.',
+      };
+    }
+    if (verification.reason === 'not_found') {
+      return {
+        order,
+        state: 'pending',
+        message: 'MTN has not registered this payment request yet. We will keep checking.',
+      };
     }
     // Network/provider trouble is temporary: keep the order exactly as it is
     // and let the next poll or the reconciler try again.
     return {
       order,
       state: 'unavailable',
-      message: 'We could not reach ExpressPay to confirm this payment yet. This page will keep checking.',
+      message: 'We could not reach MTN to confirm this payment yet. This page will keep checking.',
     };
   }
 
   if (verification.token && !paymentTokenMatches(order, verification.token)) {
-    const reason = 'ExpressPay returned payment details for a different checkout. Please contact NKAY support — do not pay again.';
+    const reason = 'MTN returned payment details for a different request. Please contact NKAY support — do not pay again.';
     const updated = await updateOrder(order.id, {
       paymentStatus: 'attention',
       paymentCheckedAt: new Date().toISOString(),
@@ -543,7 +555,7 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
   }
 
   if (verification.orderReference && !paymentReferenceMatches(order, verification.orderReference)) {
-    const reason = 'ExpressPay returned payment details that do not match this order. Please contact NKAY support — do not pay again.';
+    const reason = 'MTN returned payment details that do not match this order. Please contact NKAY support — do not pay again.';
     const updated = await updateOrder(order.id, {
       paymentStatus: 'attention',
       paymentCheckedAt: new Date().toISOString(),
@@ -558,9 +570,9 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
 
   const nowIso = new Date().toISOString();
   const transactionDetails = {
-    paymentProvider: 'expresspay',
-    paymentChannel: 'expresspay',
-    paymentMethod: verification.paymentMethod || order.paymentMethod || null,
+    paymentProvider: 'mtn_momo',
+    paymentChannel: 'mtn_momo',
+    paymentMethod: 'mtn_momo',
     paymentTransactionId: verification.transactionId || order.paymentTransactionId || null,
     paymentToken: verification.token || order.paymentToken || null,
     paymentCheckedAt: nowIso,
@@ -568,7 +580,7 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
 
   if (verification.state === 'failed') {
     const reason = verification.resultText
-      ? `ExpressPay did not complete this payment (${verification.resultText}). You can try again — you have not been charged.`
+      ? `MTN did not complete this payment (${verification.resultText}). You can try again — you have not been charged.`
       : 'The payment was not completed. You can try again — you have not been charged.';
     const updated = await updateOrder(order.id, {
       ...transactionDetails,
@@ -581,7 +593,7 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
 
   const expiresAt = order.paymentLinkExpiresAt ? Date.parse(order.paymentLinkExpiresAt) : 0;
   if (expiresAt && expiresAt < Date.now()) {
-    const reason = 'The ExpressPay checkout session expired. You can start a new payment — you have not been charged.';
+    const reason = 'The MTN MoMo payment request expired. You can start a new payment — you have not been charged.';
     const updated = await updateOrder(order.id, {
       ...transactionDetails,
       paymentStatus: 'failed',
@@ -591,14 +603,14 @@ async function verifyPaymentForOrder(order, actor, { token } = {}) {
     return { order: updated, state: 'failed', message: reason };
   }
 
-  // Pending (result 4) or an unrecognised result: ExpressPay has not reached a
-  // final state. Record the check so the UI and reconciler can see progress
-  // without changing the outcome.
+  // Pending or an unrecognised result: MTN has not reached a final state.
+  // Record the check so the UI and reconciler can see progress without
+  // changing the outcome.
   const updated = await updateOrder(order.id, transactionDetails);
   return {
     order: updated,
     state: 'pending',
-    message: 'Waiting for ExpressPay to confirm your payment.',
+    message: 'Waiting for you to approve the MTN MoMo prompt on your phone.',
   };
 }
 
@@ -622,34 +634,34 @@ export async function initiateOrderPayment(req, res) {
         'PAYMENT_NEEDS_ATTENTION'
       );
     }
-    if (!isExpressPayConfigured()) {
+    if (!isMoMoConfigured()) {
       throw httpError(
         503,
-        'Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.',
+        'Mobile money payments are not set up yet. Please contact NKAY to complete this order.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getExpressPayConfig().missing }
+        { missing: getMoMoConfig().missing }
       );
     }
 
+    const config = getMoMoConfig();
     const now = Date.now();
     const attempts = Number(order.paymentAttempts) || 0;
     const expiresAt = order.paymentLinkExpiresAt ? Date.parse(order.paymentLinkExpiresAt) : 0;
-    const liveLink = Boolean(
+    const livePrompt = Boolean(
       order.paymentStatus === 'processing' &&
-        order.paymentLink &&
         order.paymentToken &&
         (!expiresAt || expiresAt > now)
     );
 
-    // Reuse an unexpired checkout instead of creating a second one.
-    if (liveLink) {
+    // Reuse an outstanding prompt instead of sending a second one.
+    if (livePrompt) {
       return res.json({
         success: true,
         order: publicOrder(order),
-        paymentLink: order.paymentLink,
         state: 'processing',
         reused: true,
-        message: 'Continue your payment on ExpressPay.',
+        paymentPhone: order.paymentPhone || toMsisdn(order.customerPhone),
+        message: `A payment request is already waiting on ${order.paymentPhone || order.customerPhone}. Approve the MTN MoMo prompt on your phone.`,
       });
     }
 
@@ -672,60 +684,78 @@ export async function initiateOrderPayment(req, res) {
       );
     }
 
-    if (!paymentReturnUrl(order.id)) {
+    const payerPhone = toMsisdn(order.customerPhone);
+    if (!/^233\d{9}$/.test(payerPhone)) {
       throw httpError(
-        503,
-        'The payment return URL is not configured on this server.',
-        'PAYMENTS_NOT_CONFIGURED',
-        { missing: getExpressPayConfig().missing }
+        400,
+        'Enter a valid Ghana MTN MoMo number on this order before paying.',
+        'INVALID_PAYMENT_PHONE'
       );
     }
 
     const txRef = newPaymentReference(order.orderNumber);
-    const created = await createCheckout({
-      orderReference: txRef,
-      amountPesewas: order.totalPesewas,
-      currency: order.currency || 'GHS',
-      customer: {
-        name: order.customerName,
-        email: order.customerEmail,
-        phone: order.customerPhone,
-      },
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      description: `NKAY order ${order.orderNumber}`,
-    });
-
+    // The reference id is the MTN idempotency key. It is persisted BEFORE the
+    // charge request so a retry after a lost response reuses it instead of
+    // sending a second debit.
+    const referenceId = randomUUID();
     const createdIso = new Date().toISOString();
-    const sessionMs = Math.max(5, Number(getExpressPayConfig().sessionMinutes) || 60) * 60 * 1000;
+    const promptMs = Math.max(5, Number(config.promptMinutes) || 10) * 60 * 1000;
     const previousReferences = Array.isArray(order.paymentReferences) ? order.paymentReferences : [];
     const previousTokens = Array.isArray(order.paymentTokens) ? order.paymentTokens : [];
+
     const updated = await updateOrder(order.id, {
       paymentStatus: 'processing',
       orderStatus: 'new',
-      paymentProvider: 'expresspay',
-      paymentChannel: 'expresspay',
-      paymentMethod: null,
-      paymentPhone: order.customerPhone,
+      paymentProvider: 'mtn_momo',
+      paymentChannel: 'mtn_momo',
+      paymentMethod: 'mtn_momo',
+      paymentPhone: payerPhone,
       paymentReference: txRef,
       paymentReferences: [...new Set([...previousReferences, txRef])],
-      paymentToken: created.token,
-      paymentTokens: [...new Set([...previousTokens, created.token])],
-      paymentLink: created.checkoutUrl,
+      paymentToken: referenceId,
+      paymentTokens: [...new Set([...previousTokens, referenceId])],
+      paymentLink: null,
       paymentLinkCreatedAt: createdIso,
-      paymentLinkExpiresAt: new Date(now + sessionMs).toISOString(),
+      paymentLinkExpiresAt: new Date(now + promptMs).toISOString(),
       paymentTransactionId: null,
       paymentCheckedAt: createdIso,
       paymentAttempts: attempts + 1,
       failureReason: null,
     });
 
+    try {
+      await createRequestToPay({
+        referenceId,
+        orderReference: txRef,
+        amountPesewas: order.totalPesewas,
+        currency: config.currency,
+        customerPhone: payerPhone,
+        orderNumber: order.orderNumber,
+        description: `NKAY order ${order.orderNumber}`,
+      });
+    } catch (error) {
+      // Definite rejections are recorded on the order. An ambiguous network or
+      // provider failure stays `processing` so the status poll can still settle
+      // the reference that MTN may have accepted.
+      const ambiguous =
+        error.code === 'PAYMENT_PROVIDER_UNREACHABLE' || error.code === 'PAYMENT_PROVIDER_ERROR';
+      if (!ambiguous) {
+        await updateOrder(order.id, {
+          paymentStatus: 'failed',
+          orderStatus: 'new',
+          paymentCheckedAt: new Date().toISOString(),
+          failureReason: error.message || 'MTN rejected the payment request.',
+        });
+      }
+      throw error;
+    }
+
     return res.status(201).json({
       success: true,
-      order: publicOrder(updated),
-      paymentLink: created.checkoutUrl,
+      order: publicOrder((await getOrderById(order.id)) || updated),
+      paymentPhone: payerPhone,
       state: 'processing',
-      message: 'Redirecting you to ExpressPay to complete payment.',
+      message: `Payment request sent to ${payerPhone}. Approve the MTN MoMo prompt on your phone.`,
     });
   } catch (error) {
     return sendError(res, error);
@@ -741,16 +771,16 @@ export async function verifyOrderPayment(req, res) {
     if (order.paymentStatus === 'paid') {
       return res.json({ success: true, order: publicOrder(order), state: 'paid', message: 'Payment confirmed.' });
     }
-    if (!isExpressPayConfigured()) {
+    if (!isMoMoConfigured()) {
       throw httpError(
         503,
-        'Card and mobile money payments are not set up yet. Please contact NKAY to complete this order.',
+        'Mobile money payments are not set up yet. Please contact NKAY to complete this order.',
         'PAYMENTS_NOT_CONFIGURED'
       );
     }
 
     const token = String(req.body?.token || '').trim();
-    const result = await verifyPaymentForOrder(order, 'expresspay', { token });
+    const result = await verifyPaymentForOrder(order, 'mtn-momo', { token });
     return res.json({
       success: true,
       order: publicOrder(result.order),
@@ -768,12 +798,12 @@ export async function recheckOrderPayment(req, res) {
     if (!order) {
       throw httpError(404, 'Order not found.', 'ORDER_NOT_FOUND');
     }
-    if (!isExpressPayConfigured()) {
+    if (!isMoMoConfigured()) {
       throw httpError(
         503,
-        'ExpressPay is not configured on this server.',
+        'MTN Mobile Money is not configured on this server.',
         'PAYMENTS_NOT_CONFIGURED',
-        { missing: getExpressPayConfig().missing }
+        { missing: getMoMoConfig().missing }
       );
     }
 
@@ -791,56 +821,67 @@ export async function recheckOrderPayment(req, res) {
 }
 
 /**
- * ExpressPay calls this (the `post-url`) after a payment attempt.
- * The payload is treated as a hint only: it contains just `order-id` and
- * `token`, and carries no signature. We look up the order, then re-query the
- * ExpressPay Query API before changing anything.
+ * MTN calls this URL after a payment attempt when a callback host is
+ * registered. The payload is treated as a hint only: it is unsigned, so we
+ * look up the order and then re-query MTN's status API before changing
+ * anything.
  */
-export async function handleExpressPayCallback(req, res) {
+export async function handleMoMoCallback(req, res) {
   try {
-    const token = String(req.body?.token || req.query?.token || '').trim();
+    const referenceId = String(
+      req.body?.referenceId ||
+        req.body?.reference_id ||
+        req.query?.referenceId ||
+        req.query?.reference_id ||
+        ''
+    ).trim();
     const reference = String(
-      req.body?.['order-id'] || req.body?.orderId || req.query?.['order-id'] || ''
+      req.body?.externalId ||
+        req.body?.external_id ||
+        req.query?.externalId ||
+        req.query?.external_id ||
+        ''
     ).trim();
 
-    if (!token && !reference) {
+    if (!referenceId && !reference) {
       return res.json({ success: true, ignored: true });
     }
 
     const order =
-      (token ? await getOrderByPaymentToken(token) : null) ||
+      (referenceId ? await getOrderByPaymentToken(referenceId) : null) ||
       (reference ? await getOrderByReference(reference) : null);
     if (!order) {
-      // Unknown reference: acknowledge so ExpressPay does not keep retrying.
+      // Unknown reference: acknowledge so MTN does not keep retrying.
       return res.json({ success: true, ignored: true });
     }
     if (order.paymentStatus === 'paid') {
       return res.json({ success: true, alreadyPaid: true });
     }
 
-    // Only query with a token we know belongs to this order; otherwise fall
-    // back to the order's own latest token.
-    const usableToken = token && paymentTokenMatches(order, token) ? token : undefined;
-    const result = await verifyPaymentForOrder(order, 'expresspay-callback', { token: usableToken });
-    console.log(`ExpressPay callback for ${order.orderNumber}: ${result.state}`);
+    // Only query with a reference we know belongs to this order; otherwise
+    // fall back to the order's own latest reference.
+    const usableReference =
+      referenceId && paymentTokenMatches(order, referenceId) ? referenceId : undefined;
+    const result = await verifyPaymentForOrder(order, 'mtn-callback', { token: usableReference });
+    console.log(`MTN MoMo callback for ${order.orderNumber}: ${result.state}`);
     return res.json({ success: true, state: result.state, alreadyPaid: result.state === 'paid' });
   } catch (error) {
-    // Always acknowledge callbacks we cannot process; ExpressPay retries and
-    // the reconciler / page poll will catch up independently.
-    console.error('ExpressPay callback error:', error);
+    // Always acknowledge callbacks we cannot process; MTN retries and the
+    // reconciler / page poll will catch up independently.
+    console.error('MTN MoMo callback error:', error);
     return res.json({ success: true, ignored: true });
   }
 }
 
 /**
  * Reconciles live payments that have not received a usable callback.
- * Safe to call repeatedly and from a timer; it never creates a checkout
- * and never marks an order paid without a fresh ExpressPay query.
+ * Safe to call repeatedly and from a timer; it never sends a new prompt and
+ * never marks an order paid without a fresh MTN status query.
  */
 let reconciling = false;
 export async function reconcilePendingPayments({ maxAgeMs = 24 * 60 * 60 * 1000, limit = 25 } = {}) {
   if (reconciling) return { checked: 0, skipped: true };
-  if (!isExpressPayConfigured()) return { checked: 0, skipped: true };
+  if (!isMoMoConfigured()) return { checked: 0, skipped: true };
 
   reconciling = true;
   try {

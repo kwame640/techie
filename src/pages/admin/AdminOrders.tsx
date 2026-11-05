@@ -3,13 +3,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  CreditCard,
   Loader2,
   Package,
   Phone,
   RefreshCw,
   ServerCog,
   ShieldCheck,
+  Smartphone,
   XCircle,
 } from 'lucide-react';
 import { ApiError, apiRequest, formatGhs } from '../../lib/api';
@@ -28,8 +28,10 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
 
 function paymentMethodName(method: string | null | undefined) {
   const value = String(method || '').toLowerCase();
-  if (!value) return 'ExpressPay';
-  if (value.includes('mobilemoney') || value.includes('mobile_money')) return 'Mobile money';
+  if (!value) return 'MTN Mobile Money';
+  if (value.includes('mtn') || value.includes('momo') || value.includes('mobile_money') || value.includes('mobilemoney')) {
+    return 'MTN Mobile Money';
+  }
   if (value === 'card') return 'Card';
   if (value.includes('bank')) return 'Bank transfer';
   if (value === 'ussd') return 'USSD';
@@ -157,15 +159,15 @@ export const AdminOrders = () => {
       );
       setOrders((current) => current.map((item) => (item.id === data.order.id ? data.order : item)));
       if (data.state === 'paid') {
-        setNotice(`ExpressPay confirmed payment for ${order.orderNumber}. Stock has been updated.`);
+        setNotice(`MTN confirmed payment for ${order.orderNumber}. Stock has been updated.`);
       } else if (data.state === 'attention') {
-        setNotice(`ExpressPay confirmed money for ${order.orderNumber}, but the order needs attention. Do not ask the customer to pay again.`);
+        setNotice(`MTN confirmed money for ${order.orderNumber}, but the order needs attention. Do not ask the customer to pay again.`);
       } else if (data.state === 'failed') {
-        setNotice(`ExpressPay reports payment was not completed for ${order.orderNumber}.`);
+        setNotice(`MTN reports payment was not completed for ${order.orderNumber}.`);
       } else if (data.state === 'unavailable') {
-        setNotice(data.message || `ExpressPay could not be reached for ${order.orderNumber}. Try again shortly.`);
+        setNotice(data.message || `MTN could not be reached for ${order.orderNumber}. Try again shortly.`);
       } else {
-        setNotice(`Still waiting for ExpressPay to confirm ${order.orderNumber}.`);
+        setNotice(`Still waiting for MTN to confirm ${order.orderNumber}.`);
       }
     } catch (recheckError) {
       setError(recheckError instanceof ApiError ? recheckError.message : 'Could not re-check this payment.');
@@ -194,11 +196,11 @@ export const AdminOrders = () => {
         <div className="p-6 border-b flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-text flex items-center gap-2">
-              <ServerCog className="w-5 h-5 text-primary" /> ExpressPay payments
+              <ServerCog className="w-5 h-5 text-primary" /> MTN Mobile Money payments
             </h2>
             <p className="text-sm text-text-light mt-1">
-              Customers pay on ExpressPay&apos;s hosted checkout. Every payment is verified with ExpressPay&apos;s
-              Query API on the server before an order is confirmed.
+              Customers approve a MoMo PIN prompt sent to their phone. Every payment is verified with MTN&apos;s
+              Collections API on the server before an order is confirmed.
             </p>
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1.5">
@@ -207,11 +209,11 @@ export const AdminOrders = () => {
                 settings?.enabled ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
               }`}
             >
-              {settingsLoading ? 'Checking…' : settings?.enabled ? 'Live' : 'Not configured'}
+              {settingsLoading ? 'Checking…' : settings?.enabled ? 'Configured' : 'Not configured'}
             </span>
             {settings?.enabled && (
               <span className="text-[11px] font-semibold text-text-light uppercase tracking-wide">
-                {settings.mode === 'live' ? 'Live keys' : 'Sandbox keys'}
+                {settings.mode === 'live' ? 'Live' : 'Sandbox'} · {settings.targetEnvironment}
               </span>
             )}
           </div>
@@ -230,15 +232,15 @@ export const AdminOrders = () => {
                 <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800 flex gap-2">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    Checkout is collecting card, mobile money and bank payments through ExpressPay. Credentials stay on
-                    the server.
+                    Checkout is sending MTN MoMo payment requests in {settings.mode === 'live' ? 'live' : 'sandbox'}{' '}
+                    mode ({settings.targetEnvironment}, {settings.currency}). Credentials stay on the server.
                   </span>
                 </div>
               ) : (
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 flex gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold">Checkout is disabled until ExpressPay is configured</p>
+                    <p className="font-semibold">Checkout is disabled until MTN MoMo is configured</p>
                     <p className="mt-1">
                       Set these environment variables on the server, then restart it:{' '}
                       <span className="font-semibold">
@@ -254,25 +256,12 @@ export const AdminOrders = () => {
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 flex gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold">The ExpressPay callback is not ready</p>
+                    <p className="font-semibold">The MTN callback URL is not ready</p>
                     <p className="mt-1">
-                      Set a public HTTPS <span className="font-semibold">PUBLIC_SERVER_URL</span> and register the
-                      callback URL with ExpressPay. Without it, payments are still confirmed by the automatic
-                      re-check, but more slowly.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {settings.ipAllowlistRequired && (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 flex gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold">ExpressPay may block this server&apos;s IP</p>
-                    <p className="mt-1">
-                      ExpressPay returns <span className="font-semibold">status 4 / Invalid IP</span> for servers that
-                      are not allowlisted. Ask ExpressPay to allow this deployment&apos;s egress IPs (Vercel IPs are
-                      dynamic) or route ExpressPay API calls through a fixed-IP proxy.
+                      Set a public HTTPS <span className="font-semibold">PUBLIC_SERVER_URL</span> (or
+                      <span className="font-semibold"> MOMO_CALLBACK_URL</span>) and register that callback host with
+                      MTN. Without it, payments are still confirmed by the page poll and the automatic re-check, but
+                      more slowly.
                     </p>
                   </div>
                 </div>
@@ -280,47 +269,48 @@ export const AdminOrders = () => {
 
               <div className="grid sm:grid-cols-2 gap-4 text-sm">
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Callback (post-url)</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Callback URL</p>
                   <p className="mt-1 break-all font-medium text-text">
                     {settings.callbackUrl || 'Not set — add PUBLIC_SERVER_URL'}
                   </p>
                   <p className="text-xs text-text-light mt-1">
                     {settings.callbackSecure
-                      ? 'Public HTTPS endpoint. Register this URL with ExpressPay for payment notifications.'
-                      : 'Must be a public HTTPS URL for ExpressPay to deliver the callback.'}
+                      ? `Public HTTPS endpoint. Register host ${settings.callbackHost || ''} with MTN for payment notifications.`
+                      : 'Must be a public HTTPS URL for MTN to deliver the callback.'}
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-200 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Credentials</p>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     <ConfigFlag
-                      ok={settings.merchantIdSet}
-                      label={settings.merchantIdSet ? 'Merchant ID set' : 'Merchant ID missing'}
+                      ok={settings.subscriptionKeySet}
+                      label={settings.subscriptionKeySet ? 'Subscription key set' : 'Subscription key missing'}
                     />
+                    <ConfigFlag ok={settings.userIdSet} label={settings.userIdSet ? 'API user set' : 'API user missing'} />
                     <ConfigFlag ok={settings.apiKeySet} label={settings.apiKeySet ? 'API key set' : 'API key missing'} />
                   </div>
                   <p className="text-xs text-text-light mt-1">
-                    Keys are read from <span className="font-semibold">EXPAY_MERCHANT_ID</span> and{' '}
-                    <span className="font-semibold">EXPAY_API_KEY</span>.
+                    Keys are read from <span className="font-semibold">MOMO_SUBSCRIPTION_KEY</span>,{' '}
+                    <span className="font-semibold">MOMO_USER_ID</span> and{' '}
+                    <span className="font-semibold">MOMO_API_KEY</span>.
                   </p>
                 </div>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4 text-sm">
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Checkout return URL</p>
-                  <p className="mt-1 break-all font-medium text-text">
-                    {settings.returnUrlPattern || 'Not set — add PUBLIC_APP_URL'}
-                  </p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">API endpoint</p>
+                  <p className="mt-1 break-all font-medium text-text">{settings.apiBaseUrl}</p>
                   <p className="text-xs text-text-light mt-1">
-                    ExpressPay sends the customer back here after payment.
+                    Target environment <span className="font-semibold">{settings.targetEnvironment}</span>, currency{' '}
+                    <span className="font-semibold">{settings.currency}</span>.
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Checkout session</p>
-                  <p className="mt-1 font-medium text-text">{settings.sessionMinutes} minutes</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-light">Prompt window</p>
+                  <p className="mt-1 font-medium text-text">{settings.promptMinutes} minutes</p>
                   <p className="text-xs text-text-light mt-1">
-                    Unpaid checkouts expire after this window and can be re-issued from the order page.
+                    Unanswered prompts expire after this window and can be re-sent from the order page.
                   </p>
                 </div>
               </div>
@@ -342,8 +332,7 @@ export const AdminOrders = () => {
                 <Package className="w-5 h-5 text-primary" /> Orders &amp; payments
               </h2>
               <p className="text-sm text-text-light mt-1">
-                ExpressPay confirms payments automatically. Re-check any order to ask ExpressPay for the latest
-                status.
+                MTN confirms payments automatically. Re-check any order to ask MTN for the latest status.
               </p>
             </div>
             <button
@@ -438,27 +427,32 @@ export const AdminOrders = () => {
 
                     <div className="rounded-xl bg-[#faf8f6] border border-[#eee5df] p-3.5 text-sm">
                       <p className="text-xs font-semibold uppercase tracking-wide text-text-light flex items-center gap-1.5">
-                        <CreditCard className="w-3.5 h-3.5" /> Payment
+                        <Smartphone className="w-3.5 h-3.5" /> Payment
                       </p>
                       <div className="mt-1.5 space-y-0.5 text-xs text-[#5f5148]">
                         <p>
                           Method:{' '}
                           <span className="font-semibold">
-                            {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'ExpressPay checkout'}
+                            {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'MTN MoMo'}
                           </span>
                         </p>
                         <p>
                           Reference: <span className="font-semibold break-all">{order.paymentReference || order.orderNumber}</span>
                         </p>
+                        {order.paymentPhone && (
+                          <p>
+                            MoMo number: <span className="font-semibold">{order.paymentPhone}</span>
+                          </p>
+                        )}
                         {order.paymentTransactionId && (
                           <p>
-                            ExpressPay ID:{' '}
+                            MTN transaction ID:{' '}
                             <span className="font-semibold break-all">{order.paymentTransactionId}</span>
                           </p>
                         )}
                         {order.paymentStatus === 'processing' && order.paymentLinkExpiresAt && (
                           <p>
-                            Link expires: <span className="font-semibold">{when(order.paymentLinkExpiresAt)}</span>
+                            Prompt expires: <span className="font-semibold">{when(order.paymentLinkExpiresAt)}</span>
                           </p>
                         )}
                         {order.amountPaid != null && (
@@ -470,7 +464,7 @@ export const AdminOrders = () => {
                       {order.paymentStatus === 'paid' && order.paymentVerifiedAt && (
                         <p className="mt-2 text-[11px] text-green-700 flex items-center gap-1">
                           <ShieldCheck className="w-3 h-3" />
-                          Confirmed by ExpressPay {when(order.paymentVerifiedAt)}
+                          Confirmed by MTN {when(order.paymentVerifiedAt)}
                         </p>
                       )}
                       {order.failureReason && order.paymentStatus !== 'paid' && (
@@ -487,7 +481,7 @@ export const AdminOrders = () => {
                         className="inline-flex items-center gap-2 rounded-lg border border-[#e0d3ca] bg-white px-3.5 py-2 text-xs font-semibold text-[#6f3d27] hover:bg-[#fbf5f1] transition disabled:opacity-40"
                       >
                         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                        Re-check with ExpressPay
+                        Re-check with MTN
                       </button>
                       {order.paymentStatus === 'attention' && (
                         <span className="text-[11px] text-red-600">

@@ -190,43 +190,41 @@ For production deployment:
 5. Use HTTPS for all communications
 6. Set up monitoring and alerts
 
-## Checkout & ExpressPay Payments
+## Checkout & MTN MoMo Payments
 
 The storefront checkout (`/customer/checkout`) creates the order on the server.
 The server never trusts prices sent by the browser: it prices every item from
 `server/data/catalogue.json`.
 
-NKAY collects payments through the **ExpressPay (Ghana) Merchant API** hosted
-checkout. Customers can pay with mobile money (MTN MoMo, Telecel Cash, AT Money),
-debit/credit cards or bank transfer. The customer never sends money to a personal
-number, and card or wallet credentials are only entered on ExpressPay's page. The
-flow is:
+NKAY collects payments through the **MTN Mobile Money (MoMo) Collections API**.
+Checkout accepts **MTN wallets only** — there is no card or bank option. There is
+no hosted page or redirect: MTN sends a PIN prompt straight to the customer's
+phone. The flow is:
 
 1. Customer fills in delivery details and places the order. The order is created
    with `paymentStatus: "pending"`.
-2. The server calls `POST /api/submit.php` with the exact order total and a unique
-   `order-id`. ExpressPay returns a checkout `token`. The order moves to
-   `paymentStatus: "processing"` and the customer is redirected to
-   `https://expresspaygh.com/api/checkout.php?token=…` (or the sandbox host).
-3. The customer pays on ExpressPay. ExpressPay redirects them back to
-   `/order/:orderId?order-id=…&token=…` in the browser.
-4. ExpressPay also sends a `post-url` callback to
-   `/api/payments/expresspay/callback` with just `order-id` and `token`.
-   ExpressPay callbacks are **not signed**, so the payload is treated as a hint
-   only: the server ignores it and **queries the ExpressPay Query API**.
-5. Only a Query API `result: 1` whose token and `order-id` match the order, whose
-   currency is GHS and whose amount equals the order total marks the order paid.
+2. The server generates a UUID `X-Reference-Id`, stores it on the order **before**
+   charging, and calls
+   `POST /collection/v1_0/requesttopay` with the exact order total and the
+   customer's MoMo number. The order moves to `paymentStatus: "processing"`.
+3. The customer approves the prompt with their MoMo PIN on their phone. The
+   browser cannot see the result.
+4. MTN optionally calls `/api/payments/momo/callback`. MTN callbacks are **not
+   signed**, so the payload is treated as a hint only: the server ignores its
+   contents and **queries the status API**.
+5. Only a status lookup whose `referenceId`, `externalId` (our reference),
+   currency and exact amount all match the order marks the order paid.
 6. On a verified payment the order becomes `paid` / `confirmed` and stock is
-   decremented exactly once, in the same synchronous step that checks the order.
+   decremented exactly once, inside one Firestore transaction.
 7. If no callback arrives, the order page polls the server every 5 seconds and a
    background reconciler re-checks live payments every minute.
-8. If ExpressPay confirms money but the order cannot be fulfilled automatically
-   (stock sold out, amount mismatch, unexpected currency), the order moves to
+8. If MTN confirms money but the order cannot be fulfilled automatically (stock
+   sold out, amount mismatch, unexpected currency), the order moves to
    `paymentStatus: "attention"` instead. The customer is told not to pay again
    and an admin arranges a refund.
 
 The browser can never mark an order paid. It can only ask the server to
-re-check, and the server decides from ExpressPay's Query API response.
+re-check, and the server decides from MTN's status response.
 
 ### 1. Regenerate the product catalogue
 
@@ -239,23 +237,53 @@ npm run sync:catalogue
 Run this whenever products or prices change in `src/data/marketplaceData.ts` or
 `src/data/products.ts`.
 
-### 2. Get ExpressPay credentials
+### 2. Get MTN MoMo credentials
 
-1. Create a merchant account at <https://expresspaygh.com> and complete the
-   business/KYC verification for NKAY.
-2. Ask ExpressPay for your **merchant ID** and **API key**. Sandbox credentials
-   use <https://sandbox.expresspaygh.com>; live credentials use
-   <https://expresspaygh.com>.
-3. **Allowlisting (important):** ExpressPay often restricts API calls to
-   allowlisted merchant server IPs and returns `status: 4` (Invalid IP)
-   otherwise. Ask ExpressPay to allow this deployment's egress IPs — Vercel
-   serverless egress IPs are dynamic and change — or route the submit/query calls
-   through a fixed-IP proxy (for example a small VPS).
-4. Register the callback URL with ExpressPay if your account requires it:
-   `${PUBLIC_SERVER_URL}/api/payments/expresspay/callback`. The checkout request
-   also sends it as `post-url` on every payment.
-5. Make sure the server and the storefront are reachable over **public HTTPS**.
-   ExpressPay cannot redirect customers or deliver callbacks to `localhost`.
+**Sandbox**
+
+1. Create a developer account at <https://momodeveloper.mtn.com>.
+2. Subscribe to the **Collections** product. Copy the **primary subscription
+   key** — this is `MOMO_SUBSCRIPTION_KEY`.
+3. Create an API user for your app:
+
+   ```bash
+   # 1. Pick a UUID and use it as X-Reference-Id (it becomes the API user id)
+   curl -X POST https://sandbox.momodeveloper.mtn.com/v1_0/apiuser \
+     -H "X-Reference-Id: <uuid>" \
+     -H "Ocp-Apim-Subscription-Key: <subscription-key>" \
+     -H "Content-Type: application/json" \
+     -d '{"providerCallbackHost":"your-callback-host.example"}'
+
+   # 2. Create the API key for that user (returns apiKey)
+   curl -X POST https://sandbox.momodeveloper.mtn.com/v1_0/apiuser/<uuid>/apikey \
+     -H "Ocp-Apim-Subscription-Key: <subscription-key>"
+
+   # 3. Confirm you can mint an access token
+   curl -X POST https://sandbox.momodeveloper.mtn.com/collection/token \
+     -H "Authorization: Basic $(printf '%s:%s' '<uuid>' '<apiKey>' | base64)" \
+     -H "Ocp-Apim-Subscription-Key: <subscription-key>" \
+     -H "X-Target-Environment: sandbox"
+   ```
+
+   Set `MOMO_USER_ID` to the UUID and `MOMO_API_KEY` to the returned API key.
+   Sandbox settles in **EUR** and uses `X-Target-Environment: sandbox`.
+
+**Production (Ghana)**
+
+1. In the MTN developer portal, request **go-live** for the Collections product
+   and complete NKAY's business/KYC verification.
+2. Use the production subscription key, API user and API key MTN issues. These
+   are different from sandbox credentials.
+3. Production Ghana uses `X-Target-Environment: mtnghana` and **GHS**. The
+   default API host is `https://momoapi.momo.africa`. Some accounts still use the
+   older `https://proxy.momoapi.mtn.com` host — if MTN tells you to use it, set
+   `MOMO_BASE_URL` accordingly.
+4. Register your callback host with MTN (the `providerCallbackHost` used when the
+   API user was created). The callback URL is
+   `${PUBLIC_SERVER_URL}/api/payments/momo/callback`.
+
+MTN callback hosts are domain-based; Vercel's dynamic egress IPs are not a
+problem for MTN as they are for IP-allowlisted gateways.
 
 ### 3. Environment variables
 
@@ -263,36 +291,40 @@ Copy `.env.example` to `.env` and fill in:
 
 ```env
 # Required for checkout to accept payments
-EXPAY_MERCHANT_ID=your-merchant-id
-EXPAY_API_KEY=your-api-key
+MOMO_SUBSCRIPTION_KEY=your-subscription-key
+MOMO_USER_ID=your-api-user-uuid
+MOMO_API_KEY=your-api-key
 
 # "sandbox" for testing, "live" for real money
-EXPAY_ENV=live
+MOMO_ENV=live
+
+# Optional overrides (defaults shown)
+MOMO_TARGET_ENVIRONMENT=mtnghana
+MOMO_CURRENCY=GHS
+MOMO_BASE_URL=
+MOMO_TIMEOUT_MS=20000
+MOMO_PROMPT_MINUTES=10
 
 # Public URL of the storefront, e.g. https://nkay.example
-# ExpressPay returns the customer to ${PUBLIC_APP_URL}/order/:orderId
 PUBLIC_APP_URL=https://nkay.example
 
 # Public HTTPS base URL of this server, e.g. https://api.nkay.example
-# The callback becomes ${PUBLIC_SERVER_URL}/api/payments/expresspay/callback
+# The callback becomes ${PUBLIC_SERVER_URL}/api/payments/momo/callback
 # Falls back to PUBLIC_APP_URL when omitted.
 PUBLIC_SERVER_URL=https://api.nkay.example
 
-# Optional (defaults shown)
-EXPAY_SESSION_MINUTES=60
-# Leave empty to use the sandbox/live URL selected by EXPAY_ENV.
-EXPAY_BASE_URL=
-EXPAY_TIMEOUT_MS=15000
+# Optional: full callback override
+MOMO_CALLBACK_URL=
 ```
 
 Secrets are read only on the server and are never sent to the browser. Checkout is
-disabled until `EXPAY_MERCHANT_ID`, `EXPAY_API_KEY` and `PUBLIC_APP_URL` (or
-`PUBLIC_SERVER_URL`) exist. `/api/health` reports:
+disabled until `MOMO_SUBSCRIPTION_KEY`, `MOMO_USER_ID` and `MOMO_API_KEY` exist.
+`/api/health` reports:
 
 ```json
 {
   "payments": {
-    "method": "expresspay",
+    "method": "mtn_momo",
     "configured": true,
     "callbackConfigured": true,
     "missing": []
@@ -309,24 +341,24 @@ Open **Admin → Orders & payments**. The filters are **Needs attention**,
 **In progress**, **Awaiting payment**, **Paid**, **Not confirmed** and
 **All orders**.
 
-The top card shows whether ExpressPay is configured and whether sandbox or live
-credentials are in use, the callback URL and whether it is HTTPS, which
-credentials are set, the checkout return URL, the checkout session length and an
-IP-allowlist warning. Configuration is environment-based, so there is nothing to
-edit in the dashboard.
+The top card shows whether MTN MoMo is configured, whether sandbox or live
+credentials are in use, the target environment and currency, the callback URL and
+its host, which credentials are set, the API base URL and the prompt window.
+Configuration is environment-based, so there is nothing to edit in the dashboard.
 
-For any unpaid order, **Re-check with ExpressPay** asks ExpressPay's Query API for
-the latest status and applies the same verification rules as the customer flow.
-Use it when a customer says they paid but the page has not updated.
+For any unpaid order, **Re-check with MTN** asks the status API for the latest
+result and applies the same verification rules as the customer flow. Use it when
+a customer says they approved the prompt but the page has not updated.
 
-**Needs attention** means ExpressPay confirmed money but automatic fulfilment was
-not safe. Never ask that customer to pay again. Compare the amount paid and the
-order total, then refund or fulfil manually.
+**Needs attention** means MTN confirmed money but automatic fulfilment was not
+safe. Never ask that customer to pay again. Compare the amount paid and the order
+total, then refund or fulfil manually.
 
-An unpaid checkout expires after `EXPAY_SESSION_MINUTES` (60 by default). The
-customer can start a new payment from the order page; the server reuses a live
-checkout instead of creating duplicates and caps how many tokens an order can
-have.
+An unanswered prompt expires after `MOMO_PROMPT_MINUTES` (10 by default). The
+customer can start a new payment from the order page; the server reuses an
+outstanding request instead of sending a second prompt and caps how many prompts
+an order can have. A retry reuses the stored `X-Reference-Id`, which MTN treats
+as an idempotency key, so a lost response cannot double-charge.
 
 ### 5. Data storage
 
@@ -376,27 +408,29 @@ paid, so two callbacks arriving on different instances cannot both reduce stock.
 
 ### 6. Testing without live credentials
 
-`EXPAY_BASE_URL` exists so the integration can be exercised against a local
-stub. When using a stub, still set `EXPAY_MERCHANT_ID`, `EXPAY_API_KEY` and
-`PUBLIC_APP_URL` so the normal code path runs. Never point that variable at a
-third-party server in production.
+`MOMO_BASE_URL` exists so the integration can be exercised against a local stub.
+When using a stub, still set `MOMO_SUBSCRIPTION_KEY`, `MOMO_USER_ID`,
+`MOMO_API_KEY` and `PUBLIC_APP_URL` so the normal code path runs. Never point that
+variable at a third-party server in production.
 
-ExpressPay sandbox credentials are the easiest way to exercise the real hosted
-checkout. Set `EXPAY_ENV=sandbox` and use the sandbox merchant ID/API key.
+MTN sandbox credentials are the easiest way to exercise the real prompt flow.
+Set `MOMO_ENV=sandbox`, use the sandbox credentials, and pay from an MTN test
+number registered for the sandbox.
 
 The integration is also safe to test manually:
 
 - Submitting the same order twice with the same `idempotencyKey` returns the
   original order instead of creating a second one.
 - A callback and a page poll arriving together mark the order paid once.
-- A callback for an unknown `order-id` or `token` is acknowledged and ignored.
-- A callback only triggers a Query API lookup; the body is never trusted.
-- A paid amount that does not match the order total never decrements stock; the
-  order becomes `attention`.
-- An expired checkout can be re-issued from the order page without creating a
+- A callback for an unknown reference is acknowledged and ignored.
+- A callback only triggers a status lookup; the body is never trusted.
+- A paid amount or currency that does not match the order never decrements stock;
+  the order becomes `attention`.
+- An expired prompt can be re-sent from the order page without creating a
   duplicate charge.
-- `status: 4` / Invalid IP from ExpressPay is surfaced as an allowlist error
-  instead of being treated as a payment failure.
+- Missing or rejected MTN credentials surface as a configuration error, not as a
+  customer payment failure.
+
 
 
 ## Support

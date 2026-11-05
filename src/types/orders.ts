@@ -30,10 +30,10 @@ export interface OrderDelivery {
 }
 
 /**
- * pending     — order created; no ExpressPay checkout token yet.
- * processing  — ExpressPay checkout token created; customer is paying.
- * paid        — ExpressPay verified the payment; stock has been reserved.
- * failed      — the payment failed, was cancelled, or the checkout expired.
+ * pending     — order created; no MoMo request sent yet.
+ * processing  — RequestToPay sent; waiting for the customer to approve the PIN prompt.
+ * paid        — MTN verified the payment; stock has been reserved.
+ * failed      — the payment failed, was declined, or the prompt expired.
  * attention   — money was received but cannot be fulfilled automatically
  *               (stock gone or amount mismatch). Requires a human/refund.
  */
@@ -51,9 +51,9 @@ export interface OrderView {
   deliveryFee: number;
   total: number;
   paymentStatus: OrderPaymentStatus;
-  paymentChannel: 'expresspay' | 'mobile_money' | null;
+  paymentChannel: 'mtn_momo' | 'mobile_money' | null;
   paymentProvider: string | null;
-  /** ExpressPay transaction type when known, e.g. card or mobile money. */
+  /** Payment rail when known, e.g. mtn_momo. */
   paymentMethod: string | null;
   paymentPhone: string | null;
   paymentReference: string | null;
@@ -72,7 +72,7 @@ export interface OrderView {
 }
 
 export interface PaymentSettings {
-  method: 'expresspay';
+  method: 'mtn_momo';
   providerName: string;
   enabled: boolean;
   callbackConfigured: boolean;
@@ -81,14 +81,16 @@ export interface PaymentSettings {
 
 export interface AdminPaymentSettings extends PaymentSettings {
   mode: 'sandbox' | 'live';
-  merchantIdSet: boolean;
+  targetEnvironment: string;
+  currency: string;
+  subscriptionKeySet: boolean;
+  userIdSet: boolean;
   apiKeySet: boolean;
-  checkoutBaseUrl: string;
+  apiBaseUrl: string;
   callbackUrl: string | null;
+  callbackHost: string | null;
   callbackSecure: boolean;
-  returnUrlPattern: string | null;
-  sessionMinutes: number;
-  ipAllowlistRequired: boolean;
+  promptMinutes: number;
 }
 
 export interface PaymentVerificationResult {

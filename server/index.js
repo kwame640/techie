@@ -17,11 +17,11 @@ import {
   initiateOrderPayment,
   verifyOrderPayment,
   recheckOrderPayment,
-  handleExpressPayCallback,
+  handleMoMoCallback,
   reconcilePendingPayments,
   listAllOrders,
 } from './controllers/orderController.js';
-import { isExpressPayConfigured, getExpressPayConfig } from './services/expresspayService.js';
+import { isMoMoConfigured, getMoMoConfig } from './services/momoService.js';
 import { orderStoreInfo } from './models/orderModel.js';
 import { authenticateAdmin } from './middleware/auth.js';
 import { authenticateVendor, requireVendorOwnership } from './middleware/vendorAuth.js';
@@ -444,11 +444,11 @@ app.post('/api/otp/verify', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Orders & ExpressPay payments
+// Orders & MTN MoMo payments
 // Prices and stock are resolved from the server-side catalogue; amounts sent
-// by the browser are never trusted. Customers pay on ExpressPay's hosted
-// checkout and the server verifies every payment with ExpressPay's Query API
-// before marking an order paid and decrementing stock.
+// by the browser are never trusted. Customers approve a PIN prompt on their
+// phone and the server verifies every payment with MTN's status API before
+// marking an order paid and decrementing stock.
 // ---------------------------------------------------------------------------
 app.post('/api/orders/quote', quoteOrder);
 app.post('/api/orders', createOrder);
@@ -458,7 +458,7 @@ app.post('/api/orders/:id/pay', initiateOrderPayment);
 app.post('/api/orders/:id/payment/verify', verifyOrderPayment);
 
 app.get('/api/payments/settings', getPaymentSettings);
-app.post('/api/payments/expresspay/callback', handleExpressPayCallback);
+app.post('/api/payments/momo/callback', handleMoMoCallback);
 
 app.get('/api/admin/orders', authenticateAdmin, listAllOrders);
 app.post('/api/admin/orders/:id/payment/verify', authenticateAdmin, recheckOrderPayment);
@@ -466,14 +466,14 @@ app.get('/api/admin/payment-settings', authenticateAdmin, getAdminPaymentSetting
 
 // Health check
 app.get('/api/health', (req, res) => {
-  const config = getExpressPayConfig();
+  const config = getMoMoConfig();
   const storage = orderStoreInfo();
   res.json({
     status: 'ok',
     message: 'Server is running',
     payments: {
-      method: 'expresspay',
-      configured: isExpressPayConfigured(),
+      method: 'mtn_momo',
+      configured: isMoMoConfigured(),
       callbackConfigured: config.callbackConfigured,
       missing: config.configured ? [] : config.missing,
     },
@@ -520,13 +520,13 @@ const isDirectEntry = process.argv[1] && (process.argv[1] === fileURLToPath(impo
 if (isDirectEntry) {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    if (isExpressPayConfigured()) {
-      console.log(`ExpressPay payments: configured (${getExpressPayConfig().mode} mode)`);
+    if (isMoMoConfigured()) {
+      console.log(`MTN MoMo payments: configured (${getMoMoConfig().mode} mode, ${getMoMoConfig().targetEnvironment})`);
     } else {
-      console.warn(`ExpressPay payments: NOT configured (missing ${getExpressPayConfig().missing.join(', ')})`);
+      console.warn(`MTN MoMo payments: NOT configured (missing ${getMoMoConfig().missing.join(', ')})`);
     }
-    if (!getExpressPayConfig().callbackConfigured) {
-      console.warn('ExpressPay callback: NOT configured (set a public HTTPS PUBLIC_SERVER_URL)');
+    if (!getMoMoConfig().callbackConfigured) {
+      console.warn('MTN MoMo callback: NOT configured (set a public HTTPS PUBLIC_SERVER_URL)');
     }
     const storage = orderStoreInfo();
     if (storage.durable) {
@@ -536,7 +536,7 @@ if (isDirectEntry) {
     }
   });
 
-  // Safety net for missed callbacks: re-check live payments with ExpressPay.
+  // Safety net for missed callbacks: re-check live payments with MTN.
   // Timers do not run under Vercel serverless, so this only starts for the
   // standalone server. Serverless deployments still verify on page poll and
   // whenever an admin re-checks an order.

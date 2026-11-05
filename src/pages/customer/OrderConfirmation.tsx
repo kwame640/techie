@@ -5,8 +5,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
-  CreditCard,
-  ExternalLink,
   Loader2,
   MapPin,
   Package,
@@ -14,6 +12,7 @@ import {
   RefreshCw,
   ShieldCheck,
   ShoppingBag,
+  Smartphone,
   Store,
   Truck,
 } from 'lucide-react';
@@ -28,8 +27,10 @@ const MAX_POLLS = 60;
 
 function paymentMethodName(method: string | null | undefined) {
   const value = String(method || '').toLowerCase();
-  if (!value) return 'ExpressPay';
-  if (value.includes('mobilemoney') || value.includes('mobile_money')) return 'Mobile money';
+  if (!value) return 'MTN Mobile Money';
+  if (value.includes('mtn') || value.includes('momo') || value.includes('mobile_money') || value.includes('mobilemoney')) {
+    return 'MTN Mobile Money';
+  }
   if (value === 'card') return 'Card';
   if (value.includes('bank')) return 'Bank transfer';
   if (value === 'ussd') return 'USSD';
@@ -41,7 +42,7 @@ function statusMeta(order: OrderView, linkExpired: boolean) {
     return {
       tone: 'paid' as const,
       title: 'Payment confirmed',
-      message: 'ExpressPay confirmed your payment. The seller is preparing your order.',
+      message: 'MTN MoMo confirmed your payment. The seller is preparing your order.',
       Icon: CheckCircle2,
     };
   }
@@ -59,17 +60,17 @@ function statusMeta(order: OrderView, linkExpired: boolean) {
     return linkExpired
       ? {
           tone: 'pending' as const,
-          title: 'Payment session expired',
+          title: 'Payment request expired',
           message:
-            'The ExpressPay checkout session ended. If you were not charged, you can start a new payment below.',
+            'The MTN MoMo request timed out. If you were not charged, you can send a new request below.',
           Icon: Clock,
         }
       : {
           tone: 'processing' as const,
-          title: 'Complete your payment on ExpressPay',
+          title: 'Approve the payment on your phone',
           message:
-            'Finish your payment on the secure ExpressPay page. This page updates automatically once it is confirmed.',
-          Icon: CreditCard,
+            'Check your phone for the MTN MoMo prompt and enter your PIN. This page updates automatically once it is confirmed.',
+          Icon: Smartphone,
         };
   }
   if (order.paymentStatus === 'failed') {
@@ -86,8 +87,8 @@ function statusMeta(order: OrderView, linkExpired: boolean) {
     tone: 'pending' as const,
     title: 'Complete your payment',
     message:
-      'Pay securely with ExpressPay using mobile money, a card or bank transfer. Your order is confirmed after payment is verified.',
-    Icon: CreditCard,
+      'Pay with MTN Mobile Money. A request is sent to your phone and you approve it with your MoMo PIN.',
+    Icon: Smartphone,
   };
 }
 
@@ -95,7 +96,6 @@ export const OrderConfirmation = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
   const routeState = (location.state as { payError?: string } | null) || null;
-  const returnedToken = new URLSearchParams(location.search).get('token') || '';
 
   const [order, setOrder] = useState<OrderView | null>(null);
   const [settings, setSettings] = useState<PaymentSettings | null>(null);
@@ -109,7 +109,6 @@ export const OrderConfirmation = () => {
   const [actionError, setActionError] = useState<string | null>(routeState?.payError || null);
 
   const pollTimerRef = useRef<number | null>(null);
-  const redirectCheckedRef = useRef(false);
 
   const loadOrder = useCallback(async () => {
     if (!orderId) throw new Error('Missing order id.');
@@ -163,27 +162,7 @@ export const OrderConfirmation = () => {
     order?.paymentStatus === 'processing' && linkExpiresAt && now > linkExpiresAt
   );
 
-  // When ExpressPay redirects back it adds ?order-id=...&token=... . Verify that
-  // exact checkout once; the server still asks ExpressPay's Query API for truth.
-  useEffect(() => {
-    if (!order || !returnedToken || redirectCheckedRef.current) return;
-    if (order.paymentStatus === 'paid' || order.paymentStatus === 'attention') return;
-    redirectCheckedRef.current = true;
-
-    apiRequest<PaymentVerificationResult>(
-      `/api/orders/${encodeURIComponent(order.id)}/payment/verify`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ token: returnedToken }),
-      }
-    )
-      .then(applyResult)
-      .catch(() => {
-        setStatusMessage('We could not confirm the payment yet. Tap “Check status” in a moment.');
-      });
-  }, [order, returnedToken, applyResult]);
-
-  // While payment is in progress, ask the server to re-check with ExpressPay.
+  // While the prompt is outstanding, ask the server to re-check with MTN.
   // The browser never decides that a payment succeeded.
   useEffect(() => {
     if (!order || order.paymentStatus !== 'processing') return;
@@ -215,10 +194,7 @@ export const OrderConfirmation = () => {
     try {
       const result = await apiRequest<PaymentVerificationResult>(
         `/api/orders/${encodeURIComponent(order.id)}/payment/verify`,
-        {
-          method: 'POST',
-          body: JSON.stringify(returnedToken ? { token: returnedToken } : {}),
-        }
+        { method: 'POST' }
       );
       applyResult(result);
     } catch (verifyError) {
@@ -236,31 +212,29 @@ export const OrderConfirmation = () => {
     setStatusMessage(null);
     setStarting(true);
     try {
-      const result = await apiRequest<{ order: OrderView; paymentLink?: string; message?: string }>(
-        `/api/orders/${encodeURIComponent(order.id)}/pay`,
-        { method: 'POST' }
-      );
+      const result = await apiRequest<{
+        order: OrderView;
+        paymentPhone?: string;
+        message?: string;
+      }>(`/api/orders/${encodeURIComponent(order.id)}/pay`, { method: 'POST' });
       setOrder(result.order);
       setPollCount(0);
       setNow(Date.now());
 
-      const paymentLink = result.paymentLink || result.order.paymentLink;
-      if (paymentLink) {
-        window.location.assign(paymentLink);
-        return;
-      }
-
       setStarting(false);
-      setStatusMessage(result.message || 'ExpressPay did not return a checkout link. Please try again.');
+      setStatusMessage(
+        result.message ||
+          `Payment request sent to ${result.order.paymentPhone || order.customer.phone}. Approve the MTN MoMo prompt on your phone.`
+      );
     } catch (payError) {
       setStarting(false);
       setActionError(
         payError instanceof ApiError
           ? payError.message
-          : 'We could not start the ExpressPay checkout. Please try again.'
+          : 'We could not send the MTN MoMo request. Please try again.'
       );
-      // Reflect whatever the server now knows (e.g. attention or a link that
-      // was just created) instead of leaving a stale order on screen.
+      // Reflect whatever the server now knows (e.g. attention or a request
+      // that was just created) instead of leaving a stale order on screen.
       loadOrder().catch(() => {});
     }
   };
@@ -310,7 +284,7 @@ export const OrderConfirmation = () => {
 
   const badge = {
     paid: { label: 'Paid', className: 'bg-green-100 text-green-700' },
-    processing: { label: 'Pay on ExpressPay', className: 'bg-blue-100 text-blue-700' },
+    processing: { label: 'Awaiting MoMo approval', className: 'bg-blue-100 text-blue-700' },
     failed: { label: 'Not confirmed', className: 'bg-red-100 text-red-700' },
     attention: { label: 'Needs attention', className: 'bg-red-100 text-red-700' },
     pending: { label: 'Awaiting payment', className: 'bg-amber-100 text-amber-700' },
@@ -410,14 +384,14 @@ export const OrderConfirmation = () => {
             {(canPay || order.paymentStatus === 'processing' || order.paymentStatus === 'attention') && (
               <div className="mt-5 rounded-2xl border border-[#eee5df] bg-[#fcfaf9] p-4 sm:p-5">
                 <h3 className="text-sm font-bold flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-[#6f3d27]" /> ExpressPay secure checkout
+                  <Smartphone className="w-4 h-4 text-[#6f3d27]" /> MTN Mobile Money
                 </h3>
 
                 {!paymentsEnabled && (
                   <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 flex gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                     <span>
-                      Card and mobile money payments are not configured on the NKAY server. Contact NKAY with order{' '}
+                      Mobile money payments are not configured on the NKAY server. Contact NKAY with order{' '}
                       {order.orderNumber}.
                     </span>
                   </div>
@@ -427,17 +401,17 @@ export const OrderConfirmation = () => {
                   <div className="mt-3 space-y-3">
                     <div className="rounded-xl border border-blue-200 bg-white p-4">
                       <p className="text-sm text-[#5f5148]">
-                        Your <span className="font-semibold">{formatGhs(order.total)}</span> payment is waiting on
-                        ExpressPay. Finish it there and this page will confirm automatically.
+                        A request for <span className="font-semibold">{formatGhs(order.total)}</span> was sent to{' '}
+                        <span className="font-semibold">{order.paymentPhone || order.customer.phone}</span>. Approve it
+                        with your MoMo PIN and this page will confirm automatically.
                       </p>
                       <p className="text-xs text-[#927f74] mt-2">
-                        Enter your mobile money PIN, card details or bank login only on the ExpressPay page. NKAY never
-                        asks for them.
+                        Enter your PIN only on your phone or in the MTN MoMo app. NKAY never asks for it.
                       </p>
                       {order.paymentLinkExpiresAt && (
                         <p className="text-xs text-[#927f74] mt-2 flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5" />
-                          Checkout closes{' '}
+                          Request expires{' '}
                           {new Date(order.paymentLinkExpiresAt).toLocaleTimeString('en-GH', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -447,15 +421,6 @@ export const OrderConfirmation = () => {
                       )}
                     </div>
 
-                    {order.paymentLink && (
-                      <a
-                        href={order.paymentLink}
-                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#6f3d27] px-4 py-3 text-sm font-semibold text-white hover:bg-[#5d3524] transition"
-                      >
-                        <ExternalLink className="w-4 h-4" /> Continue to ExpressPay
-                      </a>
-                    )}
-
                     <button
                       type="button"
                       onClick={verifyNow}
@@ -463,7 +428,7 @@ export const OrderConfirmation = () => {
                       className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-[#e0d3ca] bg-white px-4 py-2.5 text-sm font-semibold text-[#6f3d27] hover:bg-[#fbf5f1] transition disabled:opacity-60"
                     >
                       {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                      I have paid — check status
+                      Check status
                     </button>
                   </div>
                 )}
@@ -478,7 +443,7 @@ export const OrderConfirmation = () => {
 
                     {linkExpired && (
                       <p className="mb-3 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
-                        The ExpressPay checkout session expired. If you were not charged, you can start a new payment
+                        The MTN MoMo payment request expired. If you were not charged, you can send a new request
                         below.
                       </p>
                     )}
@@ -491,17 +456,17 @@ export const OrderConfirmation = () => {
                     >
                       {starting ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" /> Opening ExpressPay…
+                          <Loader2 className="w-4 h-4 animate-spin" /> Sending MoMo request…
                         </>
                       ) : (
                         <>
-                          <CreditCard className="w-4 h-4" /> Pay {formatGhs(order.total)} with ExpressPay
+                          <Smartphone className="w-4 h-4" /> Pay {formatGhs(order.total)} with MTN MoMo
                         </>
                       )}
                     </button>
                     <p className="mt-2 text-center text-[11px] text-[#9a887d]">
-                      You will be redirected to ExpressPay. Mobile money, debit/credit card and bank transfer are
-                      accepted.
+                      We send a payment request to your MTN number. Approve it on your phone — no card or bank
+                      details are needed.
                     </p>
                   </div>
                 )}
@@ -512,7 +477,7 @@ export const OrderConfirmation = () => {
                     <p className="mt-1">{order.failureReason}</p>
                     {order.amountPaid != null && (
                       <p className="mt-1 text-xs">
-                        Amount ExpressPay confirmed:{' '}
+                        Amount MTN confirmed:{' '}
                         <span className="font-semibold">{formatGhs(order.amountPaid)}</span>
                       </p>
                     )}
@@ -582,12 +547,12 @@ export const OrderConfirmation = () => {
               <h2 className="text-sm font-bold">Payment</h2>
               <div className="mt-2 space-y-1.5 text-sm text-[#806e64]">
                 <p className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4" />
-                  {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'ExpressPay'}
+                  <Smartphone className="w-4 h-4" />
+                  {order.paymentMethod ? paymentMethodName(order.paymentMethod) : 'MTN Mobile Money'}
                 </p>
                 <p className="text-xs break-all">Reference: {reference}</p>
                 {order.paymentTransactionId && (
-                  <p className="text-xs break-all">ExpressPay ID: {order.paymentTransactionId}</p>
+                  <p className="text-xs break-all">MTN transaction ID: {order.paymentTransactionId}</p>
                 )}
                 {order.amountPaid != null && order.paymentStatus !== 'failed' && (
                   <p className="text-xs">
@@ -604,14 +569,14 @@ export const OrderConfirmation = () => {
               {order.paymentStatus === 'paid' && (
                 <p className="mt-3 rounded-lg bg-[#f5faf5] p-2.5 text-[11px] text-[#45704c] flex gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  Payment verified with ExpressPay. Keep your order number for support.
+                  Payment verified with MTN Mobile Money. Keep your order number for support.
                 </p>
               )}
 
               {order.paymentStatus === 'processing' && (
                 <p className="mt-3 rounded-lg bg-blue-50 p-2.5 text-[11px] text-blue-800 flex gap-1.5">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
-                  This order is confirmed automatically once ExpressPay verifies your payment.
+                  This order is confirmed automatically once MTN verifies your payment.
                 </p>
               )}
 

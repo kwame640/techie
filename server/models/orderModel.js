@@ -128,8 +128,8 @@ export async function createOrder(order) {
   const record = stripUndefined({
     ...order,
     orderNumber: order.orderNumber || (await generateOrderNumber()),
-    // The order number is the initial payment reference. ExpressPay gets a
-    // unique reference per checkout attempt, which is stored when payment starts.
+    // The order number is the initial payment reference. MTN gets a unique
+    // reference per RequestToPay attempt, which is stored when payment starts.
     paymentReference: order.paymentReference || order.orderNumber || undefined,
     createdAt: now,
     updatedAt: now,
