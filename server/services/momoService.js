@@ -59,7 +59,15 @@ function credentialMessage(config, httpStatus) {
 }
 
 function cleanEnv(name) {
-  return String(process.env[name] || '').trim();
+  let value = String(process.env[name] || '').trim();
+  // Vercel/dashboard users sometimes paste values with surrounding quotes.
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+  return value;
 }
 
 function trimTrailingSlash(value) {
