@@ -474,6 +474,9 @@ app.get('/api/health', (req, res) => {
     payments: {
       method: 'mtn_momo',
       configured: isMoMoConfigured(),
+      mode: config.mode,
+      targetEnvironment: config.targetEnvironment,
+      currency: config.currency,
       callbackConfigured: config.callbackConfigured,
       missing: config.configured ? [] : config.missing,
     },

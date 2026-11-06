@@ -29,9 +29,34 @@ const PRODUCTION_BASE_URL = 'https://momoapi.momo.africa';
 const DEFAULT_TIMEOUT_MS = 20000;
 const DEFAULT_PROMPT_MINUTES = 10;
 
-const CREDENTIAL_HELP =
-  'MTN rejected the MoMo API credentials. Check MOMO_USER_ID, MOMO_API_KEY and ' +
-  'MOMO_SUBSCRIPTION_KEY, and make sure MOMO_ENV matches the credentials (sandbox vs live).';
+function credentialMessage(config, httpStatus) {
+  const where = `${config.mode} mode (${config.targetEnvironment} @ ${config.baseUrl})`;
+  if (httpStatus === 401) {
+    return (
+      `MTN rejected the API user or API key (401, ${where}). ` +
+      'MOMO_USER_ID must be the exact X-Reference-Id used to create the API user, and ' +
+      'MOMO_API_KEY must be the key returned for that same user in this environment.'
+    );
+  }
+  if (httpStatus === 403) {
+    return (
+      `MTN rejected the subscription key (403, ${where}). Use the primary key from the ` +
+      '"Collections" product in the same MTN environment as the API user (sandbox keys ' +
+      'do not work in live, and live keys do not work in sandbox).'
+    );
+  }
+  if (httpStatus === 400) {
+    return (
+      `MTN rejected the credential format (400, ${where}). Check MOMO_USER_ID, ` +
+      'MOMO_API_KEY and MOMO_SUBSCRIPTION_KEY for spaces, quotes or line breaks.'
+    );
+  }
+  return (
+    `MTN rejected the MoMo API credentials (${httpStatus}, ${where}). Check MOMO_USER_ID, ` +
+    'MOMO_API_KEY and MOMO_SUBSCRIPTION_KEY, and make sure MOMO_ENV matches the credentials ' +
+    '(sandbox vs live).'
+  );
+}
 
 function cleanEnv(name) {
   return String(process.env[name] || '').trim();
@@ -145,6 +170,9 @@ export function publicMoMoSettings() {
     method: 'mtn_momo',
     providerName: 'MTN Mobile Money',
     enabled: config.configured,
+    mode: config.mode,
+    targetEnvironment: config.targetEnvironment,
+    currency: config.currency,
     callbackConfigured: config.callbackConfigured,
     missing: config.configured ? [] : config.missing,
   };
@@ -246,7 +274,7 @@ async function createAccessToken(config) {
   const status = result.response.status;
   if (!(status >= 200 && status < 300) || !result.json?.access_token) {
     if ([400, 401, 403].includes(status)) {
-      throw providerError(CREDENTIAL_HELP, 'PAYMENT_CREDENTIALS_REJECTED', { httpStatus: status });
+      throw providerError(credentialMessage(config, status), 'PAYMENT_CREDENTIALS_REJECTED', { httpStatus: status });
     }
     throw providerError('MTN could not issue an access token for this payment.', 'PAYMENT_TOKEN_FAILED', {
       httpStatus: status,
@@ -402,7 +430,7 @@ export async function createRequestToPay({
   const status = result.response.status;
   if (!(status >= 200 && status < 300)) {
     if ([401, 403].includes(status)) {
-      throw providerError(CREDENTIAL_HELP, 'PAYMENT_CREDENTIALS_REJECTED', { httpStatus: status });
+      throw providerError(credentialMessage(config, status), 'PAYMENT_CREDENTIALS_REJECTED', { httpStatus: status });
     }
     if (status === 409) {
       throw providerError(
@@ -514,4 +542,4 @@ export async function queryTransaction(referenceId) {
   return normalizeStatus(result.json, value);
 }
 
-export { CREDENTIAL_HELP };
+export { credentialMessage };

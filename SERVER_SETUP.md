@@ -285,6 +285,37 @@ Run this whenever products or prices change in `src/data/marketplaceData.ts` or
 MTN callback hosts are domain-based; Vercel's dynamic egress IPs are not a
 problem for MTN as they are for IP-allowlisted gateways.
 
+### Credentials troubleshooting
+
+Run the diagnostic locally with the same values you put in Vercel:
+
+```powershell
+$env:MOMO_SUBSCRIPTION_KEY="..."
+$env:MOMO_USER_ID="..."
+$env:MOMO_API_KEY="..."
+$env:MOMO_ENV="sandbox"
+npm run momo:diagnose
+```
+
+It prints the resolved mode/host/currency (secrets masked) and the raw MTN
+response for `POST /collection/token`. Common results:
+
+| MTN status | Meaning |
+|---|---|
+| `401` | `MOMO_USER_ID` / `MOMO_API_KEY` wrong, or the API user was created in the other environment |
+| `403` | `MOMO_SUBSCRIPTION_KEY` is not the primary key of the **Collections** product |
+| `404` | Wrong host/path — token is `/collection/token`, API-user setup is `/v1_0/apiuser` (no `/collection`) |
+| `400` | Credential values contain quotes, spaces or newlines |
+
+The most common mistake is mixing environments: sandbox credentials with
+`MOMO_ENV=live` (or the default when `MOMO_ENV` is omitted), or the opposite.
+Sandbox credentials **cannot** create a token on the production host, and live
+credentials cannot create one on `sandbox.momodeveloper.mtn.com`.
+
+To check a full prompt, add `MOMO_TEST_MSISDN=233XXXXXXXXX` (and optionally
+`MOMO_TEST_AMOUNT=1.00`). This sends a real RequestToPay; only do it with
+sandbox credentials unless you intend to charge.
+
 ### 3. Environment variables
 
 Copy `.env.example` to `.env` and fill in:
