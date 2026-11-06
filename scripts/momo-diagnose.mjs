@@ -35,16 +35,22 @@ function base64(value) {
   return Buffer.from(value).toString('base64');
 }
 
-function interpret(status) {
+function interpret(status, config) {
   if (status === 200) return 'OK';
   if (status === 401) {
-    return '401 — MOMO_USER_ID or MOMO_API_KEY is wrong for this environment. The user id must be the X-Reference-Id used when the API user was created.';
+    return config.mode === 'live'
+      ? '401 — the live User ID / Credential Token are wrong. Use the values from the MTN Partner Portal for this environment.'
+      : '401 — MOMO_USER_ID or MOMO_API_KEY is wrong for sandbox. The user id must be the X-Reference-Id used when the API user was created.';
   }
   if (status === 403) {
-    return '403 — MOMO_SUBSCRIPTION_KEY is wrong. Use the primary key from the "Collections" product, in the same environment as the API user.';
+    return '403 — MOMO_SUBSCRIPTION_KEY is wrong. Use the primary key from the "Collections" product, in the same environment as the credentials.';
   }
   if (status === 404) {
-    return '404 — wrong host or path. Sandbox host is https://sandbox.momodeveloper.mtn.com; the token path is /collection/token.';
+    const host =
+      config.mode === 'live'
+        ? 'https://momoapi.momo.africa'
+        : 'https://sandbox.momodeveloper.mtn.com';
+    return `404 — wrong host or path. The ${config.mode} host is ${host}; the token path is /collection/token.`;
   }
   if (status === 400) {
     return '400 — malformed request. Check for quotes, spaces or newlines in the credential values.';
@@ -81,8 +87,11 @@ async function main() {
   if (hasWhitespace(config.subscriptionKey)) problems.push('MOMO_SUBSCRIPTION_KEY contains whitespace');
   if (hasWhitespace(config.userId)) problems.push('MOMO_USER_ID contains whitespace');
   if (hasWhitespace(config.apiKey)) problems.push('MOMO_API_KEY contains whitespace');
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.userId)) {
-    problems.push('MOMO_USER_ID is not a UUID (it should be the X-Reference-Id used to create the API user)');
+  if (
+    config.mode === 'sandbox' &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.userId)
+  ) {
+    problems.push('MOMO_USER_ID is not a UUID (it should be the X-Reference-Id used to create the sandbox API user)');
   }
   if (config.mode === 'sandbox' && !config.baseUrl.includes('sandbox.momodeveloper.mtn.com')) {
     problems.push('MOMO_ENV=sandbox but MOMO_BASE_URL is not the sandbox host');
@@ -132,8 +141,15 @@ async function main() {
 
   console.log(`  POST ${tokenUrl} -> ${tokenResult.status}`);
   if (tokenResult.status !== 200 || !tokenResult.body?.access_token) {
-    console.log(`  ${interpret(tokenResult.status)}`);
-    console.log(`  MTN response: ${JSON.stringify(tokenResult.body)}`);
+    const raw = typeof tokenResult.body === 'string' ? tokenResult.body : JSON.stringify(tokenResult.body);
+    if (/request rejected|support id/i.test(raw)) {
+      console.log('  MTN blocked this machine at its firewall (not a credential error).');
+      console.log('  MTN does this for sandbox calls from many cloud hosts; run this');
+      console.log('  diagnostic from a local/home connection, or use live credentials.');
+    } else {
+      console.log(`  ${interpret(tokenResult.status, config)}`);
+      console.log(`  MTN response: ${raw}`);
+    }
     process.exitCode = 1;
     return;
   }

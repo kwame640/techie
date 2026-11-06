@@ -271,19 +271,39 @@ Run this whenever products or prices change in `src/data/marketplaceData.ts` or
 **Production (Ghana)**
 
 1. In the MTN developer portal, request **go-live** for the Collections product
-   and complete NKAY's business/KYC verification.
-2. Use the production subscription key, API user and API key MTN issues. These
-   are different from sandbox credentials.
-3. Production Ghana uses `X-Target-Environment: mtnghana` and **GHS**. The
-   default API host is `https://momoapi.momo.africa`. Some accounts still use the
-   older `https://proxy.momoapi.mtn.com` host — if MTN tells you to use it, set
-   `MOMO_BASE_URL` accordingly.
-4. Register your callback host with MTN (the `providerCallbackHost` used when the
-   API user was created). The callback URL is
+   and complete NKAY's business/KYC verification and partner agreement. MTN Ghana
+   commercial contact: <mmcommercial.GH@mtn.com>. Approval typically takes 2–4
+   weeks.
+2. After approval, MTN's Partner Portal issues a **User ID** and a **Credential
+   Token** (the new platform replaces the old sandbox-style API user/API key),
+   plus the production **Collections subscription key**.
+3. Set:
+
+   ```env
+   MOMO_ENV=live
+   MOMO_TARGET_ENVIRONMENT=mtnghana
+   MOMO_CURRENCY=GHS
+   MOMO_SUBSCRIPTION_KEY=<production Collections primary key>
+   MOMO_USER_ID=<Partner Portal User ID>
+   MOMO_API_KEY=<Partner Portal Credential Token>
+   ```
+
+   `MOMO_CREDENTIAL_TOKEN` is accepted as an alias for `MOMO_API_KEY`.
+4. The default live host is `https://momoapi.momo.africa`. Some accounts still
+   use the older `https://proxy.momoapi.mtn.com` host — if MTN tells you to use
+   it, set `MOMO_BASE_URL` accordingly.
+5. Register your callback host with MTN. The callback URL is
    `${PUBLIC_SERVER_URL}/api/payments/momo/callback`.
 
 MTN callback hosts are domain-based; Vercel's dynamic egress IPs are not a
 problem for MTN as they are for IP-allowlisted gateways.
+
+**Why production is required on Vercel:** MTN's **sandbox** firewall rejects
+authenticated API traffic from many cloud/server IP ranges (Vercel, Render, AWS,
+etc.) with an HTTP 200 HTML page titled *"Request Rejected"* and a support ID.
+The same request works from a local/home connection. The request never reaches
+the API, so it is not a credential or code error. MTN's live environment does not
+have this restriction. Use production credentials for the deployed checkout.
 
 ### Credentials troubleshooting
 
@@ -315,6 +335,11 @@ credentials cannot create one on `sandbox.momodeveloper.mtn.com`.
 To check a full prompt, add `MOMO_TEST_MSISDN=233XXXXXXXXX` (and optionally
 `MOMO_TEST_AMOUNT=1.00`). This sends a real RequestToPay; only do it with
 sandbox credentials unless you intend to charge.
+
+The deployed server also exposes a protected diagnostic at
+`GET /api/payments/momo/diagnose?key=<MOMO_DIAGNOSE_KEY>`. It returns the resolved
+mode/host/currency, masked credential lengths and MTN's token status. The route
+is disabled (404) unless `MOMO_DIAGNOSE_KEY` is set.
 
 ### 3. Environment variables
 
@@ -357,6 +382,9 @@ disabled until `MOMO_SUBSCRIPTION_KEY`, `MOMO_USER_ID` and `MOMO_API_KEY` exist.
   "payments": {
     "method": "mtn_momo",
     "configured": true,
+    "mode": "live",
+    "targetEnvironment": "mtnghana",
+    "currency": "GHS",
     "callbackConfigured": true,
     "missing": []
   }

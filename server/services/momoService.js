@@ -305,6 +305,15 @@ async function createAccessToken(config) {
         reason,
       });
     }
+    if (status >= 200 && status < 300 && /request rejected|support id/i.test(reason)) {
+      throw providerError(
+        'MTN blocked this server at its firewall, so no access token was issued. ' +
+          'This is an MTN sandbox restriction for cloud hosts. Use MTN production ' +
+          'credentials on the deployed server, or run the sandbox locally.',
+        'PAYMENT_PROVIDER_BLOCKED',
+        { httpStatus: status, reason }
+      );
+    }
     if (!(status >= 200 && status < 300)) {
       throw providerError(
         `MTN could not issue an access token (HTTP ${status}${reason ? `: ${reason}` : ''}). ` +
@@ -612,17 +621,26 @@ export async function diagnoseMoMoCredentials() {
   if (/\s/.test(config.subscriptionKey) || /\s/.test(config.userId) || /\s/.test(config.apiKey)) {
     problems.push('One of the credentials still contains whitespace');
   }
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.userId)) {
-    problems.push('MOMO_USER_ID is not a UUID (it must be the X-Reference-Id used to create the API user)');
+  if (
+    config.mode === 'sandbox' &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.userId)
+  ) {
+    problems.push('MOMO_USER_ID is not a UUID (it must be the X-Reference-Id used to create the sandbox API user)');
   }
   if (config.mode === 'sandbox' && config.targetEnvironment !== 'sandbox') {
     problems.push('MOMO_ENV=sandbox but MOMO_TARGET_ENVIRONMENT is not "sandbox"');
   }
-  if (config.mode === 'live' && config.targetEnvironment === 'sandbox') {
-    problems.push('MOMO_ENV=live but MOMO_TARGET_ENVIRONMENT is "sandbox"');
+  if (config.mode === 'live' && config.targetEnvironment !== 'mtnghana') {
+    problems.push('MOMO_ENV=live but MOMO_TARGET_ENVIRONMENT is not "mtnghana"');
+  }
+  if (config.mode === 'live' && config.currency !== 'GHS') {
+    problems.push('MOMO_ENV=live but MOMO_CURRENCY is not "GHS"');
   }
   if (config.mode === 'sandbox' && !config.baseUrl.includes('sandbox.momodeveloper.mtn.com')) {
     problems.push('MOMO_ENV=sandbox but the API host is not the sandbox host');
+  }
+  if (config.mode === 'live' && config.baseUrl.includes('sandbox')) {
+    problems.push('MOMO_ENV=live but the API host is a sandbox host');
   }
 
   const result = {
@@ -644,140 +662,48 @@ export async function diagnoseMoMoCredentials() {
   }
 
   const basic = Buffer.from(`${config.userId}:${config.apiKey}`).toString('base64');
-
-  const fakeBasic = Buffer.from(
-    '00000000-0000-4000-8000-000000000000:fake'
-  ).toString('base64');
-
-  const probe = async (
-    extraHeaders = {},
-    {
-      host = config.baseUrl,
-      basicAuth = basic,
-      subscriptionKey = config.subscriptionKey,
-      target = config.targetEnvironment,
-    } = {}
-  ) => {
-    try {
-      const response = await rawRequest(`${host}/collection/token`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${basicAuth}`,
-          'Ocp-Apim-Subscription-Key': subscriptionKey,
-          'X-Target-Environment': target,
-          Accept: 'application/json',
-          ...extraHeaders,
-        },
-        timeoutMs: config.timeoutMs,
-      });
-      const status = response.response.status;
-      const hasToken = Boolean(response.json?.access_token);
-      return {
-        ok: status >= 200 && status < 300 && hasToken,
-        status,
-        reason: trimReason(
-          messageFromBody(response.json, trimReason(response.text, 200) || 'no response body')
-        ),
-        expiresIn: Number(response.json?.expires_in) || null,
-      };
-    } catch (error) {
-      return { ok: false, status: 0, reason: `network: ${error.message}` };
-    }
-  };
-
-  const browserUa =
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
-  const variants = [
-    ['default', {}],
-    ['browser-ua', { 'User-Agent': browserUa }],
-    ['empty-body', { 'Content-Length': '0' }],
-    ['browser-ua+empty-body', { 'User-Agent': browserUa, 'Content-Length': '0' }],
-  ];
-
-  result.attempts = [];
-  for (const [label, extra] of variants) {
-    const attempt = await probe(extra);
-    result.attempts.push({ label, ...attempt });
-    if (!result.token || (attempt.ok && !result.token.ok)) {
-      result.token = attempt;
-    }
-    if (attempt.ok) break;
+  try {
+    const response = await rawRequest(`${config.baseUrl}/collection/token`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Ocp-Apim-Subscription-Key': config.subscriptionKey,
+        'X-Target-Environment': config.targetEnvironment,
+        Accept: 'application/json',
+      },
+      timeoutMs: config.timeoutMs,
+    });
+    const status = response.response.status;
+    const hasToken = Boolean(response.json?.access_token);
+    result.token = {
+      ok: status >= 200 && status < 300 && hasToken,
+      status,
+      reason: trimReason(
+        messageFromBody(response.json, trimReason(response.text, 200) || 'no response body')
+      ),
+      expiresIn: Number(response.json?.expires_in) || null,
+    };
+  } catch (error) {
+    result.token = { ok: false, status: 0, reason: `network: ${error.message}` };
   }
 
-  // Is the firewall rejecting every request from this host, or only requests
-  // that carry the real credentials? Fake values make the distinction.
-  const fake = await probe(
-    {},
-    { basicAuth: fakeBasic, subscriptionKey: 'fake-subscription-key' }
-  );
-  result.attempts.push({ label: 'fake-credentials', ...fake });
-
-  // Split the real values to find which one trips the firewall.
-  const realKeyOnly = await probe(
-    {},
-    { basicAuth: fakeBasic, subscriptionKey: config.subscriptionKey }
-  );
-  result.attempts.push({ label: 'real-subscription-key-only', ...realKeyOnly });
-
-  const realBasicOnly = await probe(
-    {},
-    { basicAuth: basic, subscriptionKey: 'fake-subscription-key' }
-  );
-  result.attempts.push({ label: 'real-basic-only', ...realBasicOnly });
-
-  // Same shape as a real APIM key (32 hex chars), but definitely not issued.
-  const fake32 = await probe(
-    {},
-    { basicAuth: fakeBasic, subscriptionKey: '0123456789abcdef0123456789abcdef' }
-  );
-  result.attempts.push({ label: 'fake-32hex-subscription-key', ...fake32 });
-
-  if (config.mode === 'sandbox') {
-    for (const host of ['https://sandbox.momoapi.mtn.com']) {
-      const alternate = await probe(
-        {},
-        { host, basicAuth: fakeBasic, subscriptionKey: 'fake-subscription-key' }
-      );
-      result.attempts.push({ label: `fake-credentials @ ${host}`, ...alternate });
-    }
-  }
-
-  // Does the same key behave differently on MTN's live hosts? A normal 401
-  // there (instead of the firewall page) means the key belongs to live.
-  for (const host of ['https://momoapi.momo.africa', 'https://proxy.momoapi.mtn.com']) {
-    const liveProbe = await probe(
-      {},
-      { host, basicAuth: fakeBasic, subscriptionKey: config.subscriptionKey }
-    );
-    result.attempts.push({ label: `real-subscription-key @ ${host}`, ...liveProbe });
-
-    for (const target of ['sandbox', 'mtnghana']) {
-      const fullProbe = await probe({}, { host, target });
-      result.attempts.push({ label: `real-creds @ ${host} target=${target}`, ...fullProbe });
-    }
-  }
-
-  const key = config.subscriptionKey;
-  if (key && !/^[A-Za-z0-9._~-]+$/.test(key)) {
-    result.problems.push(
-      'MOMO_SUBSCRIPTION_KEY contains characters outside A-Z a-z 0-9 . _ ~ - (check for smart quotes or copied HTML)'
-    );
-  }
-
-  if (result.token?.status === 401) {
+  if (result.token.status === 401) {
     result.token.hint =
-      'MOMO_USER_ID must be the X-Reference-Id used to create the API user, and MOMO_API_KEY the key returned for that user in this environment.';
-  } else if (result.token?.status === 403) {
-    result.token.hint = 'MOMO_SUBSCRIPTION_KEY must be the primary key of the Collections product.';
-  } else if (result.token?.status === 404) {
+      'MOMO_USER_ID and MOMO_API_KEY must belong to the same API user in this environment. On the live platform use the User ID and Credential Token from the MTN Partner Portal.';
+  } else if (result.token.status === 403) {
     result.token.hint =
-      'Wrong host or path. Sandbox host is https://sandbox.momodeveloper.mtn.com and the token path is /collection/token.';
+      'MOMO_SUBSCRIPTION_KEY must be the primary key of the Collections product in this environment.';
+  } else if (result.token.status === 404) {
+    result.token.hint =
+      'Wrong host or path. The live host is https://momoapi.momo.africa and the token path is /collection/token.';
   } else if (
-    result.attempts.every((attempt) => !attempt.ok) &&
-    /request rejected|support id/i.test(result.attempts[0]?.reason || '')
+    !result.token.ok &&
+    result.token.status >= 200 &&
+    result.token.status < 300 &&
+    /request rejected|support id/i.test(result.token.reason || '')
   ) {
     result.token.hint =
-      'MTN’s firewall rejected the request from this server (not a credential error). This usually means MTN blocks the hosting IP range or the server user agent.';
+      'MTN’s edge blocked this server (not a credential error). MTN blocks its sandbox from many cloud hosts; the live environment does not have this restriction.';
   }
 
   return result;
