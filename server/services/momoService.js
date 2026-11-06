@@ -720,6 +720,13 @@ export async function diagnoseMoMoCredentials() {
   );
   result.attempts.push({ label: 'real-basic-only', ...realBasicOnly });
 
+  // Same shape as a real APIM key (32 hex chars), but definitely not issued.
+  const fake32 = await probe(
+    {},
+    { basicAuth: fakeBasic, subscriptionKey: '0123456789abcdef0123456789abcdef' }
+  );
+  result.attempts.push({ label: 'fake-32hex-subscription-key', ...fake32 });
+
   if (config.mode === 'sandbox') {
     for (const host of ['https://sandbox.momoapi.mtn.com']) {
       const alternate = await probe(
