@@ -644,38 +644,68 @@ export async function diagnoseMoMoCredentials() {
   }
 
   const basic = Buffer.from(`${config.userId}:${config.apiKey}`).toString('base64');
-  try {
-    const response = await rawRequest(`${config.baseUrl}/collection/token`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${basic}`,
-        'Ocp-Apim-Subscription-Key': config.subscriptionKey,
-        'X-Target-Environment': config.targetEnvironment,
-        Accept: 'application/json',
-      },
-      timeoutMs: config.timeoutMs,
-    });
-    const status = response.response.status;
-    const hasToken = Boolean(response.json?.access_token);
-    result.token = {
-      ok: status >= 200 && status < 300 && hasToken,
-      status,
-      reason: trimReason(
-        messageFromBody(response.json, trimReason(response.text, 200) || 'no response body')
-      ),
-      expiresIn: Number(response.json?.expires_in) || null,
-    };
-    if (status === 401) {
-      result.token.hint =
-        'MOMO_USER_ID must be the X-Reference-Id used to create the API user, and MOMO_API_KEY the key returned for that user in this environment.';
-    } else if (status === 403) {
-      result.token.hint = 'MOMO_SUBSCRIPTION_KEY must be the primary key of the Collections product.';
-    } else if (status === 404) {
-      result.token.hint =
-        'Wrong host or path. Sandbox host is https://sandbox.momodeveloper.mtn.com and the token path is /collection/token.';
+
+  const probe = async (extraHeaders = {}) => {
+    try {
+      const response = await rawRequest(`${config.baseUrl}/collection/token`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basic}`,
+          'Ocp-Apim-Subscription-Key': config.subscriptionKey,
+          'X-Target-Environment': config.targetEnvironment,
+          Accept: 'application/json',
+          ...extraHeaders,
+        },
+        timeoutMs: config.timeoutMs,
+      });
+      const status = response.response.status;
+      const hasToken = Boolean(response.json?.access_token);
+      return {
+        ok: status >= 200 && status < 300 && hasToken,
+        status,
+        reason: trimReason(
+          messageFromBody(response.json, trimReason(response.text, 200) || 'no response body')
+        ),
+        expiresIn: Number(response.json?.expires_in) || null,
+      };
+    } catch (error) {
+      return { ok: false, status: 0, reason: `network: ${error.message}` };
     }
-  } catch (error) {
-    result.token = { ok: false, status: 0, reason: `network: ${error.message}` };
+  };
+
+  const browserUa =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+  const variants = [
+    ['default', {}],
+    ['browser-ua', { 'User-Agent': browserUa }],
+    ['empty-body', { 'Content-Length': '0' }],
+    ['browser-ua+empty-body', { 'User-Agent': browserUa, 'Content-Length': '0' }],
+  ];
+
+  result.attempts = [];
+  for (const [label, extra] of variants) {
+    const attempt = await probe(extra);
+    result.attempts.push({ label, ...attempt });
+    if (!result.token || (attempt.ok && !result.token.ok)) {
+      result.token = attempt;
+    }
+    if (attempt.ok) break;
+  }
+
+  if (result.token?.status === 401) {
+    result.token.hint =
+      'MOMO_USER_ID must be the X-Reference-Id used to create the API user, and MOMO_API_KEY the key returned for that user in this environment.';
+  } else if (result.token?.status === 403) {
+    result.token.hint = 'MOMO_SUBSCRIPTION_KEY must be the primary key of the Collections product.';
+  } else if (result.token?.status === 404) {
+    result.token.hint =
+      'Wrong host or path. Sandbox host is https://sandbox.momodeveloper.mtn.com and the token path is /collection/token.';
+  } else if (
+    result.attempts.every((attempt) => !attempt.ok) &&
+    /request rejected|support id/i.test(result.attempts[0]?.reason || '')
+  ) {
+    result.token.hint =
+      'MTN’s firewall rejected the request from this server (not a credential error). This usually means MTN blocks the hosting IP range or the server user agent.';
   }
 
   return result;
