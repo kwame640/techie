@@ -645,13 +645,20 @@ export async function diagnoseMoMoCredentials() {
 
   const basic = Buffer.from(`${config.userId}:${config.apiKey}`).toString('base64');
 
-  const probe = async (extraHeaders = {}) => {
+  const fakeBasic = Buffer.from(
+    '00000000-0000-4000-8000-000000000000:fake'
+  ).toString('base64');
+
+  const probe = async (
+    extraHeaders = {},
+    { host = config.baseUrl, basicAuth = basic, subscriptionKey = config.subscriptionKey } = {}
+  ) => {
     try {
-      const response = await rawRequest(`${config.baseUrl}/collection/token`, {
+      const response = await rawRequest(`${host}/collection/token`, {
         method: 'POST',
         headers: {
-          Authorization: `Basic ${basic}`,
-          'Ocp-Apim-Subscription-Key': config.subscriptionKey,
+          Authorization: `Basic ${basicAuth}`,
+          'Ocp-Apim-Subscription-Key': subscriptionKey,
           'X-Target-Environment': config.targetEnvironment,
           Accept: 'application/json',
           ...extraHeaders,
@@ -690,6 +697,24 @@ export async function diagnoseMoMoCredentials() {
       result.token = attempt;
     }
     if (attempt.ok) break;
+  }
+
+  // Is the firewall rejecting every request from this host, or only requests
+  // that carry the real credentials? Fake values make the distinction.
+  const fake = await probe(
+    {},
+    { basicAuth: fakeBasic, subscriptionKey: 'fake-subscription-key' }
+  );
+  result.attempts.push({ label: 'fake-credentials', ...fake });
+
+  if (config.mode === 'sandbox') {
+    for (const host of ['https://sandbox.momoapi.mtn.com']) {
+      const alternate = await probe(
+        {},
+        { host, basicAuth: fakeBasic, subscriptionKey: 'fake-subscription-key' }
+      );
+      result.attempts.push({ label: `fake-credentials @ ${host}`, ...alternate });
+    }
   }
 
   if (result.token?.status === 401) {
