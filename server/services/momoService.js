@@ -651,7 +651,12 @@ export async function diagnoseMoMoCredentials() {
 
   const probe = async (
     extraHeaders = {},
-    { host = config.baseUrl, basicAuth = basic, subscriptionKey = config.subscriptionKey } = {}
+    {
+      host = config.baseUrl,
+      basicAuth = basic,
+      subscriptionKey = config.subscriptionKey,
+      target = config.targetEnvironment,
+    } = {}
   ) => {
     try {
       const response = await rawRequest(`${host}/collection/token`, {
@@ -659,7 +664,7 @@ export async function diagnoseMoMoCredentials() {
         headers: {
           Authorization: `Basic ${basicAuth}`,
           'Ocp-Apim-Subscription-Key': subscriptionKey,
-          'X-Target-Environment': config.targetEnvironment,
+          'X-Target-Environment': target,
           Accept: 'application/json',
           ...extraHeaders,
         },
@@ -745,6 +750,11 @@ export async function diagnoseMoMoCredentials() {
       { host, basicAuth: fakeBasic, subscriptionKey: config.subscriptionKey }
     );
     result.attempts.push({ label: `real-subscription-key @ ${host}`, ...liveProbe });
+
+    for (const target of ['sandbox', 'mtnghana']) {
+      const fullProbe = await probe({}, { host, target });
+      result.attempts.push({ label: `real-creds @ ${host} target=${target}`, ...fullProbe });
+    }
   }
 
   const key = config.subscriptionKey;
