@@ -707,6 +707,19 @@ export async function diagnoseMoMoCredentials() {
   );
   result.attempts.push({ label: 'fake-credentials', ...fake });
 
+  // Split the real values to find which one trips the firewall.
+  const realKeyOnly = await probe(
+    {},
+    { basicAuth: fakeBasic, subscriptionKey: config.subscriptionKey }
+  );
+  result.attempts.push({ label: 'real-subscription-key-only', ...realKeyOnly });
+
+  const realBasicOnly = await probe(
+    {},
+    { basicAuth: basic, subscriptionKey: 'fake-subscription-key' }
+  );
+  result.attempts.push({ label: 'real-basic-only', ...realBasicOnly });
+
   if (config.mode === 'sandbox') {
     for (const host of ['https://sandbox.momoapi.mtn.com']) {
       const alternate = await probe(
