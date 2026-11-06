@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { randomInt } from 'crypto';
+import { randomInt, timingSafeEqual } from 'crypto';
 import { getOtp, saveOtp, updateOtp, deleteOtp } from './models/otpModel.js';
 import { sendOtpEmail } from './services/emailService.js';
 import { registerBusiness } from './controllers/businessController.js';
@@ -21,7 +21,7 @@ import {
   reconcilePendingPayments,
   listAllOrders,
 } from './controllers/orderController.js';
-import { isMoMoConfigured, getMoMoConfig } from './services/momoService.js';
+import { isMoMoConfigured, getMoMoConfig, diagnoseMoMoCredentials } from './services/momoService.js';
 import { orderStoreInfo } from './models/orderModel.js';
 import { authenticateAdmin } from './middleware/auth.js';
 import { authenticateVendor, requireVendorOwnership } from './middleware/vendorAuth.js';
@@ -459,6 +459,28 @@ app.post('/api/orders/:id/payment/verify', verifyOrderPayment);
 
 app.get('/api/payments/settings', getPaymentSettings);
 app.post('/api/payments/momo/callback', handleMoMoCallback);
+
+// Protected credential diagnostic. Disabled unless MOMO_DIAGNOSE_KEY is set.
+// Returns masked configuration plus MTN's raw token response; never secrets.
+app.get('/api/payments/momo/diagnose', async (req, res) => {
+  const expected = String(process.env.MOMO_DIAGNOSE_KEY || '').trim();
+  if (!expected) {
+    return res.status(404).json({ success: false, error: 'Not found' });
+  }
+  const supplied = String(req.query.key || '');
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return res.status(401).json({ success: false, error: 'Invalid diagnostic key.' });
+  }
+  try {
+    const diagnostics = await diagnoseMoMoCredentials();
+    return res.json({ success: true, diagnostics });
+  } catch (error) {
+    console.error('[momo] diagnose failed', error);
+    return res.status(500).json({ success: false, error: 'Diagnostic failed.' });
+  }
+});
 
 app.get('/api/admin/orders', authenticateAdmin, listAllOrders);
 app.post('/api/admin/orders/:id/payment/verify', authenticateAdmin, recheckOrderPayment);

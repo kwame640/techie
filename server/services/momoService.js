@@ -226,7 +226,15 @@ function providerError(message, code, details) {
 
 function messageFromBody(body, fallback) {
   if (!body || typeof body !== 'object') return fallback;
-  return String(body.message || body.error || body.code || fallback);
+  const detail = body.error_description || body.errorMessage || body.error_message;
+  const base = String(body.message || body.error || body.code || '');
+  if (detail && base && !String(detail).includes(base)) return `${base}: ${detail}`;
+  return String(detail || base || fallback);
+}
+
+function trimReason(value, max = 200) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
 async function rawRequest(url, { method = 'GET', headers = {}, body, timeoutMs } = {}) {
@@ -281,12 +289,35 @@ async function createAccessToken(config) {
 
   const status = result.response.status;
   if (!(status >= 200 && status < 300) || !result.json?.access_token) {
-    if ([400, 401, 403].includes(status)) {
-      throw providerError(credentialMessage(config, status), 'PAYMENT_CREDENTIALS_REJECTED', { httpStatus: status });
-    }
-    throw providerError('MTN could not issue an access token for this payment.', 'PAYMENT_TOKEN_FAILED', {
-      httpStatus: status,
+    const reason = trimReason(
+      messageFromBody(result.json, trimReason(result.text, 200) || 'no response body')
+    );
+    console.error('[momo] token request failed', {
+      status,
+      reason,
+      mode: config.mode,
+      targetEnvironment: config.targetEnvironment,
+      baseUrl: config.baseUrl,
     });
+    if ([400, 401, 403].includes(status)) {
+      throw providerError(credentialMessage(config, status), 'PAYMENT_CREDENTIALS_REJECTED', {
+        httpStatus: status,
+        reason,
+      });
+    }
+    if (!(status >= 200 && status < 300)) {
+      throw providerError(
+        `MTN could not issue an access token (HTTP ${status}${reason ? `: ${reason}` : ''}). ` +
+          'Check the MoMo subscription key, API user and API key for this environment.',
+        'PAYMENT_TOKEN_FAILED',
+        { httpStatus: status, reason }
+      );
+    }
+    throw providerError(
+      'MTN answered the token request without an access token. Check the MoMo subscription key and API user.',
+      'PAYMENT_TOKEN_FAILED',
+      { httpStatus: status, reason }
+    );
   }
 
   return {
@@ -454,10 +485,20 @@ export async function createRequestToPay({
         { httpStatus: status }
       );
     }
+    const reason = trimReason(
+      messageFromBody(result.json, 'MTN rejected the payment request. Please check the order details.')
+    );
+    console.error('[momo] requesttopay rejected', {
+      status,
+      reason,
+      mode: config.mode,
+      targetEnvironment: config.targetEnvironment,
+      baseUrl: config.baseUrl,
+    });
     throw providerError(
-      messageFromBody(result.json, 'MTN rejected the payment request. Please check the order details.'),
+      `MTN rejected the payment request (HTTP ${status}${reason ? `: ${reason}` : ''}).`,
       'PAYMENT_REQUEST_REJECTED',
-      { httpStatus: status, providerStatus: result.text.slice(0, 300) }
+      { httpStatus: status, providerStatus: trimReason(result.text, 300) }
     );
   }
 
@@ -548,6 +589,96 @@ export async function queryTransaction(referenceId) {
   }
 
   return normalizeStatus(result.json, value);
+}
+
+function maskSecret(value) {
+  const text = String(value || '');
+  if (!text) return '(empty)';
+  if (text.length <= 8) return `${text.slice(0, 2)}… (${text.length} chars)`;
+  return `${text.slice(0, 4)}…${text.slice(-2)} (${text.length} chars)`;
+}
+
+/**
+ * Masked credential check used by the protected diagnostic route. It never
+ * returns secret values, and it performs a real token request so the operator
+ * can see MTN's exact HTTP status and reason.
+ */
+export async function diagnoseMoMoCredentials() {
+  const config = getMoMoConfig();
+  const problems = [];
+  if (!config.subscriptionKey) problems.push('MOMO_SUBSCRIPTION_KEY is empty');
+  if (!config.userId) problems.push('MOMO_USER_ID is empty');
+  if (!config.apiKey) problems.push('MOMO_API_KEY is empty');
+  if (/\s/.test(config.subscriptionKey) || /\s/.test(config.userId) || /\s/.test(config.apiKey)) {
+    problems.push('One of the credentials still contains whitespace');
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.userId)) {
+    problems.push('MOMO_USER_ID is not a UUID (it must be the X-Reference-Id used to create the API user)');
+  }
+  if (config.mode === 'sandbox' && config.targetEnvironment !== 'sandbox') {
+    problems.push('MOMO_ENV=sandbox but MOMO_TARGET_ENVIRONMENT is not "sandbox"');
+  }
+  if (config.mode === 'live' && config.targetEnvironment === 'sandbox') {
+    problems.push('MOMO_ENV=live but MOMO_TARGET_ENVIRONMENT is "sandbox"');
+  }
+  if (config.mode === 'sandbox' && !config.baseUrl.includes('sandbox.momodeveloper.mtn.com')) {
+    problems.push('MOMO_ENV=sandbox but the API host is not the sandbox host');
+  }
+
+  const result = {
+    mode: config.mode,
+    targetEnvironment: config.targetEnvironment,
+    currency: config.currency,
+    baseUrl: config.baseUrl,
+    callbackConfigured: config.callbackConfigured,
+    subscriptionKey: maskSecret(config.subscriptionKey),
+    userId: maskSecret(config.userId),
+    apiKey: maskSecret(config.apiKey),
+    problems,
+    token: null,
+  };
+
+  if (!config.configured) {
+    result.token = { ok: false, status: 0, reason: 'credentials missing' };
+    return result;
+  }
+
+  const basic = Buffer.from(`${config.userId}:${config.apiKey}`).toString('base64');
+  try {
+    const response = await rawRequest(`${config.baseUrl}/collection/token`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Ocp-Apim-Subscription-Key': config.subscriptionKey,
+        'X-Target-Environment': config.targetEnvironment,
+        Accept: 'application/json',
+      },
+      timeoutMs: config.timeoutMs,
+    });
+    const status = response.response.status;
+    const hasToken = Boolean(response.json?.access_token);
+    result.token = {
+      ok: status >= 200 && status < 300 && hasToken,
+      status,
+      reason: trimReason(
+        messageFromBody(response.json, trimReason(response.text, 200) || 'no response body')
+      ),
+      expiresIn: Number(response.json?.expires_in) || null,
+    };
+    if (status === 401) {
+      result.token.hint =
+        'MOMO_USER_ID must be the X-Reference-Id used to create the API user, and MOMO_API_KEY the key returned for that user in this environment.';
+    } else if (status === 403) {
+      result.token.hint = 'MOMO_SUBSCRIPTION_KEY must be the primary key of the Collections product.';
+    } else if (status === 404) {
+      result.token.hint =
+        'Wrong host or path. Sandbox host is https://sandbox.momodeveloper.mtn.com and the token path is /collection/token.';
+    }
+  } catch (error) {
+    result.token = { ok: false, status: 0, reason: `network: ${error.message}` };
+  }
+
+  return result;
 }
 
 export { credentialMessage };
