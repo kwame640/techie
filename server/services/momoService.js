@@ -730,6 +730,23 @@ export async function diagnoseMoMoCredentials() {
     }
   }
 
+  // Does the same key behave differently on MTN's live hosts? A normal 401
+  // there (instead of the firewall page) means the key belongs to live.
+  for (const host of ['https://momoapi.momo.africa', 'https://proxy.momoapi.mtn.com']) {
+    const liveProbe = await probe(
+      {},
+      { host, basicAuth: fakeBasic, subscriptionKey: config.subscriptionKey }
+    );
+    result.attempts.push({ label: `real-subscription-key @ ${host}`, ...liveProbe });
+  }
+
+  const key = config.subscriptionKey;
+  if (key && !/^[A-Za-z0-9._~-]+$/.test(key)) {
+    result.problems.push(
+      'MOMO_SUBSCRIPTION_KEY contains characters outside A-Z a-z 0-9 . _ ~ - (check for smart quotes or copied HTML)'
+    );
+  }
+
   if (result.token?.status === 401) {
     result.token.hint =
       'MOMO_USER_ID must be the X-Reference-Id used to create the API user, and MOMO_API_KEY the key returned for that user in this environment.';
